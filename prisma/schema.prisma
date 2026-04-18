@@ -1,0 +1,290 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ─── Auth Models (NextAuth) ─────────────────────────────────────
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  password      String?
+  image         String?
+  currency      String    @default("EUR")
+  language      String    @default("de")
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts              Account[]
+  sessions              Session[]
+  portfolios            Portfolio[]
+  notificationSettings  NotificationSettings?
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ─── Portfolio Models ────────────────────────────────────────────
+
+model Portfolio {
+  id          String   @id @default(cuid())
+  name        String
+  description String?
+  userId      String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  user      User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  holdings  Holding[]
+  trades    Trade[]
+}
+
+model Asset {
+  id          String    @id @default(cuid())
+  symbol      String    @unique
+  name        String
+  type        AssetType @default(CRYPTO)
+  coingeckoId String?
+  logoUrl     String?
+  decimals    Int       @default(8)
+  createdAt   DateTime  @default(now())
+
+  holdings     Holding[]
+  trades       Trade[]
+  priceHistory PriceHistory[]
+  taxEvents    TaxEvent[]
+}
+
+enum AssetType {
+  CRYPTO
+  STOCK
+  DEFI
+  NFT
+  FIAT
+}
+
+model Holding {
+  id           String   @id @default(cuid())
+  portfolioId  String
+  assetId      String
+  amount       Float
+  avgBuyPrice  Float
+  currentPrice Float    @default(0)
+  updatedAt    DateTime @updatedAt
+
+  portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset     Asset     @relation(fields: [assetId], references: [id])
+
+  @@unique([portfolioId, assetId])
+}
+
+// ─── Trading Models ──────────────────────────────────────────────
+
+model Trade {
+  id          String      @id @default(cuid())
+  portfolioId String
+  assetId     String
+  exchangeId  String?
+  type        TradeType
+  amount      Float
+  price       Float
+  fee         Float       @default(0)
+  feeCurrency String      @default("EUR")
+  notes       String?
+  executedAt  DateTime
+  createdAt   DateTime    @default(now())
+
+  portfolio  Portfolio   @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
+  asset      Asset       @relation(fields: [assetId], references: [id])
+  exchange   Exchange?   @relation(fields: [exchangeId], references: [id])
+  taxEvents  TaxEvent[]
+}
+
+enum TradeType {
+  BUY
+  SELL
+  TRANSFER_IN
+  TRANSFER_OUT
+  STAKING_REWARD
+  AIRDROP
+  MINING
+}
+
+// ─── Exchange Models ─────────────────────────────────────────────
+
+model Exchange {
+  id          String       @id @default(cuid())
+  name        String
+  displayName String
+  type        ExchangeType @default(CEX)
+  apiKey      String?
+  apiSecret   String?
+  isActive    Boolean      @default(true)
+  isMock      Boolean      @default(true)
+  lastSync    DateTime?
+  createdAt   DateTime     @default(now())
+
+  trades Trade[]
+}
+
+enum ExchangeType {
+  CEX
+  DEX
+  WALLET
+}
+
+// ─── DeFi Models ─────────────────────────────────────────────────
+
+model DeFiPosition {
+  id          String            @id @default(cuid())
+  protocol    String
+  chain       String
+  type        DeFiPositionType
+  assetSymbol String
+  amount      Float
+  valueUsd    Float
+  apy         Float?
+  startedAt   DateTime
+  updatedAt   DateTime          @updatedAt
+
+  @@index([protocol])
+}
+
+enum DeFiPositionType {
+  LIQUIDITY_POOL
+  STAKING
+  LENDING
+  BORROWING
+  YIELD_FARMING
+}
+
+// ─── NFT Models ──────────────────────────────────────────────────
+
+model NFT {
+  id           String   @id @default(cuid())
+  tokenId      String
+  contractAddr String
+  name         String
+  collection   String
+  chain        String
+  imageUrl     String?
+  floorPrice   Float    @default(0)
+  purchasePrice Float   @default(0)
+  purchasedAt  DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([contractAddr, tokenId])
+}
+
+// ─── Price History ───────────────────────────────────────────────
+
+model PriceHistory {
+  id        String   @id @default(cuid())
+  assetId   String
+  price     Float
+  currency  String   @default("EUR")
+  timestamp DateTime @default(now())
+
+  asset Asset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@index([assetId, timestamp])
+}
+
+// ─── Tax Models ──────────────────────────────────────────────────
+
+model TaxEvent {
+  id          String      @id @default(cuid())
+  tradeId     String
+  assetId     String
+  gainLoss    Float
+  costBasis   Float
+  proceeds    Float
+  type        TaxEventType
+  method      TaxMethod   @default(FIFO)
+  taxYear     Int
+  country     String      @default("DE")
+  createdAt   DateTime    @default(now())
+
+  trade Trade @relation(fields: [tradeId], references: [id], onDelete: Cascade)
+  asset Asset @relation(fields: [assetId], references: [id])
+}
+
+enum TaxEventType {
+  SHORT_TERM
+  LONG_TERM
+  INCOME
+  EXEMPT
+}
+
+enum TaxMethod {
+  FIFO
+  LIFO
+  HIFO
+  AVERAGE
+}
+
+// ─── Notification Settings ───────────────────────────────────────
+
+model NotificationSettings {
+  id               String   @id @default(cuid())
+  userId           String   @unique
+  priceAlerts      Boolean  @default(true)
+  portfolioSummary Boolean  @default(true)
+  tradeConfirm     Boolean  @default(false)
+  security         Boolean  @default(true)
+  taxReminder      Boolean  @default(false)
+  
+  // Eigene SMTP-Einstellungen
+  smtpHost         String?
+  smtpPort         String?
+  smtpUser         String?
+  smtpPass         String?
+  smtpFrom         String?
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
