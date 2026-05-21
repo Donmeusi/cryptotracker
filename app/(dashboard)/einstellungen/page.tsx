@@ -4,10 +4,10 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import {
   User, Shield, Database, Bell, Palette, ChevronRight,
-  CheckCircle, AlertCircle, Download,
+  CheckCircle, Download,
 } from "lucide-react";
 import { downloadCSV, downloadJSON } from "@/lib/exportUtils";
-import { MOCK_HOLDINGS, MOCK_ASSETS, generateMockTrades, MOCK_DEFI_POSITIONS, MOCK_NFTS, formatCurrency } from "@/lib/mock/data";
+import { MOCK_HOLDINGS, MOCK_ASSETS, generateMockTrades, MOCK_DEFI_POSITIONS, MOCK_NFTS } from "@/lib/mock/data";
 
 const WAEHRUNGEN = [
   { code: "EUR", name: "Euro (€)" },
@@ -100,7 +100,7 @@ type ThemeId = typeof THEMES[number]["id"];
 const ACCENT_COLORS = [
   { id: "green", label: "Grün", color: "#22c55e" },
   { id: "blue", label: "Blau", color: "#3b82f6" },
-  { id: "violet", label: "Indigo", color: "#6366f1" },
+  { id: "teal", label: "Teal", color: "#14b8a6" },
   { id: "orange", label: "Orange", color: "#f59e0b" },
   { id: "pink", label: "Pink", color: "#ec4899" },
 ];

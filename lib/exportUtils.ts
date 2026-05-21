@@ -220,20 +220,24 @@ export function generateTaxPDF(params: {
 </html>`;
 
   return new Promise((resolve) => {
-    const w = window.open("", "_blank", "width=1024,height=768");
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank", "width=1024,height=768");
     if (!w) {
       // Fallback if popup blocked: download as HTML
       _dataURIDownload(
         "data:text/html;charset=utf-8," + encodeURIComponent(html),
         `CryptoTracker_Steuerbericht_${year}.html`
       );
+      URL.revokeObjectURL(url);
       resolve();
       return;
     }
-    w.document.write(html);
-    w.document.close();
-    // Resolve after print dialog opens
-    setTimeout(resolve, 3000);
+    // Resolve after print dialog opens; then release object URL
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve();
+    }, 3000);
   });
 }
 
@@ -357,18 +361,22 @@ export function generateTradesPDF(params: {
 </html>`;
 
   return new Promise((resolve) => {
-    const w = window.open("", "_blank", "width=1100,height=768");
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const w = window.open(url, "_blank", "width=1100,height=768");
     if (!w) {
       _dataURIDownload(
         "data:text/html;charset=utf-8," + encodeURIComponent(html),
         `CryptoTracker_Trades_${new Date().toISOString().slice(0, 10)}.html`
       );
+      URL.revokeObjectURL(url);
       resolve();
       return;
     }
-    w.document.write(html);
-    w.document.close();
-    setTimeout(resolve, 3000);
+    setTimeout(() => {
+      URL.revokeObjectURL(url);
+      resolve();
+    }, 3000);
   });
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_DEFI_POSITIONS, MOCK_EXCHANGES, formatCurrency } from "@/lib/mock/data";
+import { MOCK_EXCHANGES } from "@/lib/mock/data";
 import { Plus, RefreshCw, CheckCircle, XCircle, Zap, Loader2, Unlink } from "lucide-react";
 
 const EXCHANGE_LOGOS: Record<string, string> = {

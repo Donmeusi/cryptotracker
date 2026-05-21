@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_NFTS, formatCurrency } from "@/lib/mock/data";
+import { MOCK_NFTS } from "@/lib/mock/data";
 import { Image as ImageIcon, TrendingUp, TrendingDown, Plus, X, CheckCircle, Edit2, Trash2 } from "lucide-react";
 
 interface NewNFT {

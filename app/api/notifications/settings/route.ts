@@ -52,7 +52,7 @@ export async function PUT(req: Request) {
     smtpFrom?: string;
   };
 
-  const updateData: any = {
+  const updateData: Record<string, boolean | string | undefined> = {
     ...(body.priceAlerts !== undefined && { priceAlerts: body.priceAlerts }),
     ...(body.portfolioSummary !== undefined && { portfolioSummary: body.portfolioSummary }),
     ...(body.tradeConfirm !== undefined && { tradeConfirm: body.tradeConfirm }),

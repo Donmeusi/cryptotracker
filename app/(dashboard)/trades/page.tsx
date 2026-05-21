@@ -8,7 +8,6 @@ import {
   Plus, Download, X, CheckCircle,
   AlertCircle, Loader2, FileText, Edit2, Trash2
 } from "lucide-react";
-import { downloadCSV, generateTradesPDF } from "@/lib/exportUtils";
 
 const TYPE_LABELS: Record<string, string> = {
   BUY: "Kauf", SELL: "Verkauf", TRANSFER_IN: "Eingang",

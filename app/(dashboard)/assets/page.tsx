@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { MOCK_ASSETS, MOCK_HOLDINGS, formatCurrency, formatPercent } from "@/lib/mock/data";
-import { Plus, Search, X, TrendingUp, TrendingDown, Loader2, AlertCircle, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, X, Loader2, AlertCircle, Edit2, Trash2 } from "lucide-react";
 import { useLivePrices } from "@/lib/hooks/useLivePrices";
 
 const TYPE_OPTIONS = ["CRYPTO", "DEFI", "NFT", "STOCK"];
@@ -69,7 +69,7 @@ export default function AssetsPage() {
     setTimeout(() => { setShowModal(false); setForm(EMPTY); setSaved(false); setFormError(""); setEditSymbol(null); }, 900);
   }
 
-  function handleEdit(item: any) {
+  function handleEdit(item: { symbol: string; asset: { name: string }; amount: number; avgBuyPrice: number }) {
     setForm({
       symbol: item.symbol,
       name: item.asset.name || "",
@@ -154,11 +154,14 @@ export default function AssetsPage() {
                     </td>
                     <td className="mono primary">{formatCurrency(item.asset.price, "EUR")}</td>
                     <td>
-                      {"priceChange24h" in item.asset && (
-                        <span className={`badge ${(item.asset as any).priceChange24h >= 0 ? "badge-green" : "badge-red"}`}>
-                          {(item.asset as any).priceChange24h >= 0 ? "▲" : "▼"} {Math.abs((item.asset as any).priceChange24h).toFixed(2)}%
-                        </span>
-                      )}
+                      {"priceChange24h" in item.asset && (() => {
+                        const pct = (item.asset as { priceChange24h: number }).priceChange24h;
+                        return (
+                          <span className={`badge ${pct >= 0 ? "badge-green" : "badge-red"}`}>
+                            {pct >= 0 ? "▲" : "▼"} {Math.abs(pct).toFixed(2)}%
+                          </span>
+                        );
+                      })()}
                     </td>
                     <td className="mono">{item.amount.toFixed(item.asset.price > 1000 ? 4 : 2)} {item.symbol}</td>
                     <td className="mono">{formatCurrency(item.avgBuyPrice, "EUR")}</td>

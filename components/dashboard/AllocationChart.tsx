@@ -1,11 +1,11 @@
 "use client";
 
-import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer, Legend } from "recharts";
+import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
 import { formatCurrency } from "@/lib/mock/data";
 
 const COLORS = [
   "#22c55e", "#f59e0b", "#3b82f6", "#14b8a6",
-  "#8b5cf6", "#ec4899", "#f97316", "#06b6d4",
+  "#06b6d4", "#ec4899", "#f97316", "#a3e635",
 ];
 
 interface AllocationChartProps {

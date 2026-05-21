@@ -32,7 +32,6 @@ export default async function DashboardPage() {
   );
   const isPositive = pnlAbsolute >= 0;
   const history30d = generatePortfolioHistory(30);
-  const history7d = generatePortfolioHistory(7);
 
   const defiValue = MOCK_DEFI_POSITIONS.reduce((sum, p) => sum + p.valueUsd, 0);
   const totalValue = portfolioValue + defiValue;

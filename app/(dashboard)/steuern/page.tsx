@@ -4,14 +4,14 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/mock/data";
 import { FileText, Download, Calculator, Info, Loader2 } from "lucide-react";
 import { downloadCSV, generateTaxPDF } from "@/lib/exportUtils";
-import { TaxEvent, TaxSummary, TaxResult } from "@/lib/tax/taxCalculator";
+import { TaxResult } from "@/lib/tax/taxCalculator";
 
 export default function SteuernPage() {
   const [selectedYear, setSelectedYear] = useState("2024");
   const [selectedMethod, setSelectedMethod] = useState<"FIFO" | "LIFO" | "HIFO">("FIFO");
   const [exporting, setExporting] = useState<"idle" | "csv" | "pdf">("idle");
   const [taxData, setTaxData] = useState<TaxResult | null>(null);
-  const [loading, setLoading] = useState(true);
+  const [_loading, setLoading] = useState(true);
 
   useEffect(() => {
     let active = true;
