@@ -9,6 +9,10 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) 
 ## [v0.2.0] - 2026-08-05
 
 ### ✨ Hinzugefügt (Added)
+- **Docker & Containerisierung (`Dockerfile` & `docker-compose.yml`)**:
+  - Multi-Stage Dockerfile auf Basis von Node 22 Alpine für minimale Image-Größen.
+  - Next.js Standalone Output Integration (`output: "standalone"`).
+  - Ready-to-use `docker-compose.yml` für 1-Klick Deployment.
 - **On-Chain Wallet Auto-Sync & Scanner (`/api/wallet/scan`)**:
   - Unterstützung für Ethereum (`0x...`), Bitcoin (`bc1...`/`1...`), Solana und Polygon Adressen.
   - Automatisches Scannen und Abrufen von Token-Guthaben (ETH, USDT, LINK, BTC, SOL).

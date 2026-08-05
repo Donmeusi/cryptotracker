@@ -2,7 +2,7 @@
 
 > **Dein privater, selbst-gehosteter Krypto-Portfolio-Manager** — Open-Source, datenschutzorientiert, ohne Cloud-Abhängigkeit.
 
-Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wallets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM, NextAuth.js v5 und Recharts — mit einem hochwertigen Dark/Light-Mode-UI und Live-Preisen.
+Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wallets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM, NextAuth.js v5 und Recharts — mit einem hochwertigen Dark/Light-Mode-UI, Docker-Unterstützung und Live-Preisen.
 
 ---
 
@@ -15,6 +15,7 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
 | 🔗 **On-Chain Wallet Scanner** | Automatischer Balance-Scan für Ethereum (`0x...`), Bitcoin (`bc1...`), Solana & Polygon Adressen |
 | 📄 **PDF Trade-Import** | Parser zur automatischen Extraktion von Kauf/Verkauf-Transaktionen aus PDF-Kontoauszügen |
 | 📱 **Mobile Responsiv** | Vollständige Responsivität (keine horizontale Laufleiste) mit mobilem Side-Drawer Navigation |
+| 🐳 **Docker Ready** | Optimiertes Multi-Stage Dockerfile (`output: "standalone"`) & Docker Compose Setup |
 | 💼 **Assets Tracker** | CRUD für alle Krypto-Positionen, Live-Preise, PnL pro Asset |
 | 🖼️ **NFT Manager** | Manuelle NFT-Erfassung mit Floor-Preis und Collection-Tracking |
 | 📈 **Trade-Historie** | Vollständige Transaktionsübersicht mit Filter, PDF-Import, Edit & Delete |
@@ -24,55 +25,69 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
 
 ---
 
-## 🛠️ Tech Stack
+## 🐳 Installation mit Docker & Docker Compose
+
+### Schnellstart mit Docker Compose (Empfohlen)
+
+1. Repository klonen:
+   ```bash
+   git clone https://github.com/Donmeusi/cryptotracker.git
+   cd cryptotracker
+   ```
+
+2. Container bauen und im Hintergrund starten:
+   ```bash
+   docker compose up -d --build
+   ```
+
+3. Die App ist direkt erreichbar unter:
+   [http://localhost:3000](http://localhost:3000) 🎉
+
+---
+
+### Manuelle Installation mit Docker CLI
+
+1. Docker-Image bauen:
+   ```bash
+   docker build -t cryptotracker:latest .
+   ```
+
+2. Container ausführen:
+   ```bash
+   docker run -d \
+     --name cryptotracker \
+     -p 3000:3000 \
+     -e NEXTAUTH_URL=http://localhost:3000 \
+     -e NEXTAUTH_SECRET=dein-secret-key-hier \
+     cryptotracker:latest
+   ```
+
+---
+
+## 🛠️ Tech Stack & Architektur
 
 | Schicht | Technologie |
 |---------|------------|
-| **Framework** | [Next.js 15](https://nextjs.org/) (App Router, Turbopack) |
-| **Datenbank** | [Prisma ORM](https://www.prisma.io/) + SQLite (lokal) / PostgreSQL (Prod) |
+| **Framework** | [Next.js 15](https://nextjs.org/) (App Router, Turbopack, Standalone Output) |
+| **Container** | [Docker](https://www.docker.com/) & Docker Compose (Multi-Stage Node 22 Alpine) |
+| **Datenbank** | [Prisma ORM](https://www.prisma.io/) + SQLite / PostgreSQL |
 | **Auth** | [NextAuth.js v5 Beta](https://authjs.dev/) — Credentials Provider |
 | **Charts** | [Recharts](https://recharts.org/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
 | **Sprache** | TypeScript 5 — vollständig typisiert |
-| **Linting & Audit** | ESLint v9 (Flat Config), Antigravity Master Checklist |
 
 ---
 
-## 🚀 Quickstart
+## 🚀 Lokale Installation (ohne Docker)
 
-### 1. Repository klonen
+### 1. Abhängigkeiten installieren & starten
 
 ```bash
 git clone https://github.com/Donmeusi/cryptotracker.git
 cd cryptotracker
-```
-
-### 2. Abhängigkeiten installieren
-
-```bash
 npm install
-```
-
-### 3. Umgebungsvariablen konfigurieren
-
-Erstelle eine `.env` Datei im Root-Verzeichnis:
-
-```env
-# Datenbank (SQLite lokal)
-DATABASE_URL="file:./prisma/cryptotracker.db"
-
-# NextAuth
-NEXTAUTH_URL="http://localhost:3000"
-NEXTAUTH_SECRET="dein-geheimes-secret-hier"
-```
-
-### 4. Entwicklungsserver starten
-
-```bash
 npm run dev
 ```
-
-Die App läuft unter [http://localhost:3000](http://localhost:3000) 🎉
 
 ---
 
@@ -81,7 +96,7 @@ Die App läuft unter [http://localhost:3000](http://localhost:3000) 🎉
 | Script | Beschreibung |
 |--------|-------------|
 | `npm run dev` | Entwicklungsserver mit Turbopack |
-| `npm run build` | Produktions-Build |
+| `npm run build` | Produktions-Build (Standalone Mode) |
 | `npm run start` | Produktionsserver starten |
 | `npm run db:push` | Schema direkt in DB schreiben |
 | `npm run db:generate` | Prisma Client neu generieren |
