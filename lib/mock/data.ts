@@ -155,19 +155,58 @@ export const generateMockTrades = () => {
 };
 
 // Mock Portfolio Performance (Zeitreihe)
-export const generatePortfolioHistory = (days: number) => {
+export const generatePortfolioHistory = (days: number = 30) => {
   const history = [];
-  let value = 28000;
+  const points = days === 1 ? 24 : Math.min(days, 60);
+  const stepMs = (days * 24 * 60 * 60 * 1000) / points;
 
-  for (let i = days; i >= 0; i--) {
-    const date = new Date(Date.now() - i * 24 * 60 * 60 * 1000);
-    const change = (Math.random() - 0.4) * 800;
-    value = Math.max(10000, value + change);
+  let baseVal = 24000;
+  const btcBaseVal = 42000;
+
+  if (days === 1) baseVal = 32500;
+  else if (days === 7) baseVal = 31000;
+  else if (days === 30) baseVal = 28000;
+  else if (days === 365) baseVal = 18000;
+  else baseVal = 12000;
+
+  let currentVal = baseVal;
+  let currentBtc = btcBaseVal;
+
+  const now = Date.now();
+  const startVal = baseVal;
+  const startBtc = btcBaseVal;
+
+  for (let i = points; i >= 0; i--) {
+    const timestamp = now - i * stepMs;
+    const dateObj = new Date(timestamp);
+
+    let dateLabel = "";
+    if (days === 1) {
+      dateLabel = dateObj.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    } else if (days <= 30) {
+      dateLabel = dateObj.toLocaleDateString("de-DE", { day: "numeric", month: "short" });
+    } else if (days <= 365) {
+      dateLabel = dateObj.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
+    } else {
+      dateLabel = dateObj.toLocaleDateString("de-DE", { month: "short", year: "2-digit" });
+    }
+
+    if (i !== points) {
+      const volatility = days === 1 ? 150 : days <= 30 ? 600 : 1400;
+      currentVal = Math.max(5000, currentVal + (Math.random() - 0.47) * volatility);
+      currentBtc = Math.max(15000, currentBtc + (Math.random() - 0.46) * (volatility * 1.5));
+    }
+
+    const portfolioReturn = parseFloat((((currentVal - startVal) / startVal) * 100).toFixed(2));
+    const btcReturn = parseFloat((((currentBtc - startBtc) / startBtc) * 100).toFixed(2));
 
     history.push({
-      date: date.toLocaleDateString("de-DE", { month: "short", day: "numeric" }),
-      value: parseFloat(value.toFixed(2)),
-      btcValue: parseFloat((value * 0.6).toFixed(2)),
+      date: dateLabel,
+      timestamp,
+      value: parseFloat(currentVal.toFixed(2)),
+      btcValue: parseFloat(currentBtc.toFixed(2)),
+      portfolioReturn,
+      btcReturn,
     });
   }
 

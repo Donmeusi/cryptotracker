@@ -6,8 +6,10 @@ import {
 } from "@/lib/mock/data";
 import {
   Plus, Download, X, CheckCircle,
-  AlertCircle, Loader2, FileText, Edit2, Trash2
+  AlertCircle, Loader2, FileText, Edit2, Trash2, UploadCloud
 } from "lucide-react";
+import PdfImportModal from "@/components/trades/PdfImportModal";
+import { ParsedTrade } from "@/app/api/trades/parse-pdf/route";
 
 const TYPE_LABELS: Record<string, string> = {
   BUY: "Kauf", SELL: "Verkauf", TRANSFER_IN: "Eingang",
@@ -55,10 +57,26 @@ export default function TradesPage() {
   const [activeFilter, setActiveFilter] = useState("Alle");
   const [exchangeFilter, setExchangeFilter] = useState("Alle Börsen");
   const [showModal, setShowModal] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [form, setForm] = useState<NewTrade>(EMPTY_FORM);
   const [saving, setSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [formError, setFormError] = useState("");
+
+  function handleBatchImportPdf(importedTrades: ParsedTrade[]) {
+    const formattedTrades: Trade[] = importedTrades.map((t) => ({
+      id: t.id || `pdf-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      asset: t.asset,
+      type: t.type,
+      exchange: t.exchange || "Binance",
+      amount: Number(t.amount) || 0,
+      price: Number(t.price) || 0,
+      fee: Number(t.fee) || 0,
+      executedAt: t.executedAt ? new Date(t.executedAt).toISOString() : new Date().toISOString(),
+    }));
+
+    setTrades((prev) => [...formattedTrades, ...prev]);
+  }
 
   const filteredTrades = useMemo(() => {
     let result = trades;
@@ -210,6 +228,15 @@ export default function TradesPage() {
           >
             {pdfExporting ? <Loader2 size={15} className="spin" /> : <FileText size={15} />}
             PDF Export
+          </button>
+          <button
+            className="btn btn-secondary"
+            id="trades-pdf-import"
+            onClick={() => setShowPdfModal(true)}
+            style={{ borderColor: "rgba(16, 185, 129, 0.4)", color: "#10b981" }}
+          >
+            <UploadCloud size={15} />
+            PDF Import
           </button>
           <button
             className="btn btn-primary"
@@ -659,7 +686,6 @@ export default function TradesPage() {
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
         select.input, textarea.input { cursor: pointer; }
-        input[type="datetime-local"].input { color-scheme: dark; }
         .btn-icon { background:none;border:none;color:var(--text-secondary);cursor:pointer;padding:4px;border-radius:var(--radius-sm);display:inline-flex;align-items:center;justify-content:center;transition:all var(--transition-fast); }
         .btn-icon:hover { background:var(--bg-elevated);color:var(--text-primary); }
         .text-red:hover { color:var(--red) !important;background:var(--red-dim) !important; }
@@ -667,6 +693,11 @@ export default function TradesPage() {
           .form-grid-2 { grid-template-columns: 1fr; }
         }
       `}</style>
+      <PdfImportModal
+        isOpen={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        onImportTrades={handleBatchImportPdf}
+      />
     </div>
   );
 }

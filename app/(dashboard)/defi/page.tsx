@@ -22,7 +22,7 @@ const TYPE_LABELS: Record<string, string> = {
 
 const CHAIN_COLORS: Record<string, string> = {
   Ethereum: "#3b82f6",
-  Polygon: "#8b5cf6",
+  Polygon: "#06b6d4",
   BSC: "#f59e0b",
   Avalanche: "#ef4444",
   Arbitrum: "#14b8a6",

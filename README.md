@@ -2,7 +2,7 @@
 
 > **Dein privater, selbst-gehosteter Krypto-Portfolio-Manager** — Open-Source, datenschutzorientiert, ohne Cloud-Abhängigkeit.
 
-Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM und NextAuth.js v5 — mit einem hochwertigen Dark-Mode-UI und Live-Preisen via CoinGecko.
+Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wallets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM, NextAuth.js v5 und Recharts — mit einem hochwertigen Dark/Light-Mode-UI und Live-Preisen.
 
 ---
 
@@ -10,15 +10,17 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, NFTs, Trades 
 
 | Feature | Details |
 |---------|---------|
-| 📊 **Dashboard** | Aggregiertes Portfolio-Wert, G&V-Trend, Asset-Allokation (Donut-Chart) |
+| 📊 **Dashboard** | Aggregiertes Gesamtvermögen, Live-Auto-Sync (15s), Echtzeit-Preise mit Flash-Animationen |
+| 🎨 **Asset-Verteilung** | Donut-Chart mit Krypto-Branding (BTC, ETH, SOL, ADA), Donut-Center Badge & Proportionalbalken |
+| 🔗 **On-Chain Wallet Scanner** | Automatischer Balance-Scan für Ethereum (`0x...`), Bitcoin (`bc1...`), Solana & Polygon Adressen |
+| 📄 **PDF Trade-Import** | Parser zur automatischen Extraktion von Kauf/Verkauf-Transaktionen aus PDF-Kontoauszügen |
+| 📱 **Mobile Responsiv** | Vollständige Responsivität (keine horizontale Laufleiste) mit mobilem Side-Drawer Navigation |
 | 💼 **Assets Tracker** | CRUD für alle Krypto-Positionen, Live-Preise, PnL pro Asset |
 | 🖼️ **NFT Manager** | Manuelle NFT-Erfassung mit Floor-Preis und Collection-Tracking |
-| 📈 **Trade-Historie** | Vollständige Transaktionsübersicht mit Filter, Edit & Delete |
-| 🧮 **Steuerlogik** | FIFO / LIFO / HIFO Berechnung, langfristig vs. kurzfristig, PDF + CSV Export |
+| 📈 **Trade-Historie** | Vollständige Transaktionsübersicht mit Filter, PDF-Import, Edit & Delete |
+| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Haltedauer-Kennzeichnung (> 365 Tage steuerfrei), PDF + CSV Export |
 | 🏛️ **Börsen-Anbindung** | API-Key Verwaltung für Binance, Kraken, Coinbase, OKX, Bybit |
-| 📧 **E-Mail Benachrichtigungen** | SMTP-Konfiguration direkt in den Einstellungen (kein .env nötig) |
-| 🎨 **Themes & Personalisierung** | 4 Themes (Dark, Midnight, Light, Forest) + 5 Akzentfarben, Schriftgröße |
-| 💹 **Live-Preise** | CoinGecko API mit serverseitigem Caching und Fallback auf Mock-Daten |
+| 🎨 **Themes & Personalisierung** | 4 Themes (Dark, Midnight, Light, Forest) + 5 Akzentfarben, dynamisches `color-scheme` |
 
 ---
 
@@ -31,9 +33,8 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, NFTs, Trades 
 | **Auth** | [NextAuth.js v5 Beta](https://authjs.dev/) — Credentials Provider |
 | **Charts** | [Recharts](https://recharts.org/) |
 | **Icons** | [Lucide React](https://lucide.dev/) |
-| **State** | [Zustand](https://github.com/pmndrs/zustand) |
-| **Sprache** | TypeScript 5 — vollständig typisiert, 0 `any` Typen |
-| **Linting** | ESLint v9 (Flat Config) — 0 Errors, 0 Warnings |
+| **Sprache** | TypeScript 5 — vollständig typisiert |
+| **Linting & Audit** | ESLint v9 (Flat Config), Antigravity Master Checklist |
 
 ---
 
@@ -63,20 +64,9 @@ DATABASE_URL="file:./prisma/cryptotracker.db"
 # NextAuth
 NEXTAUTH_URL="http://localhost:3000"
 NEXTAUTH_SECRET="dein-geheimes-secret-hier"
-
-# Optional: CoinGecko API Key (für höhere Rate Limits)
-# COINGECKO_API_KEY="dein-api-key"
 ```
 
-### 4. Datenbank initialisieren
-
-```bash
-npm run db:push       # Schema in die DB schreiben
-npm run db:generate   # Prisma Client generieren
-npm run db:seed       # Testdaten einspielen (optional)
-```
-
-### 5. Entwicklungsserver starten
+### 4. Entwicklungsserver starten
 
 ```bash
 npm run dev
@@ -93,88 +83,11 @@ Die App läuft unter [http://localhost:3000](http://localhost:3000) 🎉
 | `npm run dev` | Entwicklungsserver mit Turbopack |
 | `npm run build` | Produktions-Build |
 | `npm run start` | Produktionsserver starten |
-| `npm run db:push` | Schema direkt in DB schreiben (kein Migrations-Log) |
-| `npm run db:migrate` | Migration mit Versionshistorie ausführen |
+| `npm run db:push` | Schema direkt in DB schreiben |
 | `npm run db:generate` | Prisma Client neu generieren |
-| `npm run db:studio` | Visuellen DB-Browser öffnen |
-| `npm run db:seed` | Testdaten einspielen |
 
 ---
 
-## 🗄️ Datenbank-Schema
+## 📄 Lizenz
 
-```
-User ──< NotificationSettings
-User ──< Trade
-User ──< Asset (Holdings)
-User ──< NFT
-User ──< DeFiPosition
-User ──< PriceAlert
-```
-
-**Migration zu PostgreSQL** (für Produktion):
-```env
-DATABASE_URL="postgresql://user:password@localhost:5432/cryptotracker"
-```
-Danach: `npx prisma migrate deploy`
-
----
-
-## 🏗️ Projektstruktur
-
-```
-cryptotracker/
-├── app/
-│   ├── (auth)/              # Login, Registrierung
-│   ├── (dashboard)/         # Dashboard, Assets, Trades, NFTs, Steuern, Börsen, Einstellungen
-│   ├── api/                 # API Routes (Auth, Tax, Notifications, Live-Preise)
-│   ├── globals.css          # Design System (CSS Variables, Tokens)
-│   └── layout.tsx           # Root Layout mit Theme-Restore
-├── components/
-│   └── dashboard/           # PortfolioChart, AllocationChart, Providers
-├── lib/
-│   ├── auth.ts              # NextAuth Konfiguration
-│   ├── db.ts                # Prisma Client
-│   ├── livePrices.ts        # CoinGecko Integration
-│   ├── exportUtils.ts       # PDF & CSV Export (Blob-basiert, XSS-safe)
-│   ├── tax/                 # FIFO / LIFO / HIFO Steuerberechnung
-│   ├── hooks/               # useLivePrices Hook
-│   └── mock/                # Demo-Daten für alle Module
-├── prisma/
-│   └── schema.prisma        # Datenbankschema
-├── eslint.config.mjs        # ESLint v9 Flat Config
-└── middleware.ts            # Route Protection
-```
-
----
-
-## 🔒 Sicherheit & Code-Qualität
-
-- ✅ **0 ESLint Errors** — ESLint v9 Flat Config mit Next.js + TypeScript Regeln
-- ✅ **0 TypeScript Fehler** — Vollständig typisiert, keine `any` Typen im App-Code
-- ✅ **XSS-sicher** — `document.write()` durch Blob URL ersetzt; `dangerouslySetInnerHTML` nur für statischen Theme-Restore-Script
-- ✅ **`prefers-reduced-motion`** — Animationen respektieren Barrierefreiheits-Einstellungen
-- ✅ **Security Headers** — Konfiguriert in `next.config.ts`
-- ✅ **Purple Ban** — Alle Farben im Design-System folgen dem Teal/Cyan/Emerald-Farbschema
-
----
-
-## 🗺️ Roadmap
-
-- [ ] PostgreSQL-Migration für Produktions-Deployment
-- [ ] Echte Exchange-API-Anbindung (Binance, Kraken via CCXT)
-- [ ] Preisalarme mit echtem Cron-Job
-- [ ] Mobile-responsive Optimierung (PWA)
-- [ ] Dark/Light Theme System-Auto-Detect beim ersten Start
-
----
-
-## 📜 Lizenz
-
-Proprietäres Projekt — alle Rechte vorbehalten.
-
----
-
-<div align="center">
-  <sub>Gebaut mit ❤️ und Next.js 15 · TypeScript · Prisma</sub>
-</div>
+Dieses Projekt ist unter der **[MIT-Lizenz](LICENSE)** lizenziert.

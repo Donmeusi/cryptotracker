@@ -38,11 +38,12 @@ const THEMES = [
       "--bg-surface": "#0d1117",
       "--bg-card": "#111827",
       "--bg-elevated": "#1a2235",
+      "--bg-input": "#0f172a",
       "--text-primary": "#f1f5f9",
       "--text-secondary": "#94a3b8",
       "--text-muted": "#64748b",
       "--border": "rgba(255,255,255,0.07)",
-      "--border-strong": "rgba(255,255,255,0.12)",
+      "--border-strong": "rgba(255,255,255,0.22)",
     },
   },
   {
@@ -54,11 +55,12 @@ const THEMES = [
       "--bg-surface": "#080d1a",
       "--bg-card": "#0e1628",
       "--bg-elevated": "#162035",
+      "--bg-input": "#0b1326",
       "--text-primary": "#e2e8f0",
       "--text-secondary": "#7c93b5",
       "--text-muted": "#4a5d7a",
       "--border": "rgba(100,149,237,0.08)",
-      "--border-strong": "rgba(100,149,237,0.15)",
+      "--border-strong": "rgba(100,149,237,0.25)",
     },
   },
   {
@@ -67,14 +69,15 @@ const THEMES = [
     previewBg: "#f8fafc",
     vars: {
       "--bg-base": "#f1f5f9",
-      "--bg-surface": "#f8fafc",
+      "--bg-surface": "#ffffff",
       "--bg-card": "#ffffff",
       "--bg-elevated": "#e2e8f0",
+      "--bg-input": "#ffffff",
       "--text-primary": "#0f172a",
-      "--text-secondary": "#475569",
-      "--text-muted": "#94a3b8",
-      "--border": "rgba(0,0,0,0.08)",
-      "--border-strong": "rgba(0,0,0,0.15)",
+      "--text-secondary": "#334155",
+      "--text-muted": "#64748b",
+      "--border": "#cbd5e1",
+      "--border-strong": "#94a3b8",
     },
   },
   {
@@ -86,6 +89,7 @@ const THEMES = [
       "--bg-surface": "#0f2214",
       "--bg-card": "#162b1b",
       "--bg-elevated": "#1e3a25",
+      "--bg-input": "#0d2113",
       "--text-primary": "#dcfce7",
       "--text-secondary": "#86efac",
       "--text-muted": "#4ade80",
@@ -112,6 +116,7 @@ function applyTheme(themeId: ThemeId, accentColor: string) {
   Object.entries(theme.vars).forEach(([key, val]) => {
     root.style.setProperty(key, val);
   });
+  root.style.colorScheme = themeId === "light" ? "light" : "dark";
   root.style.setProperty("--green", accentColor);
   root.style.setProperty("--green-dim", accentColor + "22");
   localStorage.setItem("ct-theme", themeId);
