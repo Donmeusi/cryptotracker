@@ -903,8 +903,9 @@ function SystemUpdatePanel() {
         setLocalCommit(data.updatedCommit);
         setUpdatesAvailable(false);
       }
-    } catch (e: any) {
-      setLogs((prev) => [...prev, `Fehler beim Ausführen: ${e?.message || e}`]);
+    } catch (e: unknown) {
+      const errMsg = e instanceof Error ? e.message : String(e);
+      setLogs((prev) => [...prev, `Fehler beim Ausführen: ${errMsg}`]);
     } finally {
       setUpdating(false);
     }
@@ -1027,7 +1028,7 @@ function SystemUpdatePanel() {
               gap: 8,
             }}
           >
-            <CheckCircle size={16} /> Neues Update auf dem Kanal '{targetBranch}' verfügbar!
+            <CheckCircle size={16} /> Neues Update auf dem Kanal &apos;{targetBranch}&apos; verfügbar!
           </div>
         ) : (
           <div
@@ -1045,7 +1046,7 @@ function SystemUpdatePanel() {
             }}
           >
             <CheckCircle size={16} style={{ color: "var(--green)" }} />
-            Dein System ist auf dem neuesten Stand für den Kanal '{currentBranch}'.
+            Dein System ist auf dem neuesten Stand für den Kanal &apos;{currentBranch}&apos;.
           </div>
         )}
 
