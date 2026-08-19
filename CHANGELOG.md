@@ -15,6 +15,9 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) 
   - Interaktive Hover-Tooltips für FIFO, LIFO und HIFO Methoden mit steuerlichen Erläuterungen (§ 23 EStG, 1-jährige Haltefrist & Verlustverrechnung).
 - **Modul-Verwaltung (`/einstellungen`)**:
   - Neuer Menüpunkt *Module & Funktionen* in den Einstellungen zum flexiblen Ein- und Ausblenden der Bereiche DeFi (`/defi`) und NFTs (`/nfts`) in der Seitenleiste in Echtzeit.
+- **Externe Datenbank-Konfiguration (`/api/system/db-config`)**:
+  - Vollständige UI-Verwaltung unter *Einstellungen → Datenbank & Export* zum Verbinden externer **PostgreSQL**-, **MySQL/MariaDB**- oder **SQLite**-Datenbanken ohne `.env`-Bearbeitung.
+  - Inklusive *„Verbindung testen“*-Funktion (`SELECT 1`) und automatischem Schema-Sync.
 - **System-Updates & Branch-Wechsel (`/api/system/update`)**:
   - Neuer Einstellungsbereich *System & Updates* analog zur Gefahrstoff-App: Anzeige von installierter/remoter Commit-Version, Wechsel zwischen `main` (Stable) und `beta` (Beta) Kanälen sowie 1-Klick Update-Funktion mit automatischer Prisma-Schema-Synchronisierung.
 

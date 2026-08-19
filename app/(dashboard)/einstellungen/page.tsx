@@ -1086,6 +1086,276 @@ function SystemUpdatePanel() {
   );
 }
 
+type DbFormState = {
+  type: "sqlite" | "postgresql" | "mysql";
+  url: string;
+  host: string;
+  port: number | string;
+  database: string;
+  username: string;
+  password: string;
+  hasPassword?: boolean;
+};
+
+function DbConfigPanel() {
+  const [form, setForm] = useState<DbFormState>({
+    type: "sqlite",
+    url: "",
+    host: "",
+    port: 5432,
+    database: "",
+    username: "",
+    password: "",
+  });
+  const [loading, setLoading] = useState(true);
+  const [testing, setTesting] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [testResult, setTestResult] = useState<{ success: boolean; message?: string; error?: string } | null>(null);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [logs, setLogs] = useState<string[]>([]);
+
+  useEffect(() => {
+    fetch("/api/system/db-config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) {
+          setForm({
+            type: data.type || "sqlite",
+            url: data.url || "",
+            host: data.host || "",
+            port: data.port || (data.type === "postgresql" ? 5432 : 3306),
+            database: data.database || "",
+            username: data.username || "",
+            password: "",
+            hasPassword: Boolean(data.hasPassword),
+          });
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  const handleTestConnection = async () => {
+    setTesting(true);
+    setTestResult(null);
+    try {
+      const res = await fetch("/api/system/db-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "test", config: form }),
+      });
+      const data = await res.json();
+      if (data.success) {
+        setTestResult({ success: true, message: data.message });
+      } else {
+        setTestResult({ success: false, error: data.error });
+      }
+    } catch (e: any) {
+      setTestResult({ success: false, error: e?.message || "Netzwerkfehler beim Verbindungstest" });
+    } finally {
+      setTesting(false);
+    }
+  };
+
+  const handleSave = async () => {
+    setSaving(true);
+    setSaveStatus("idle");
+    setLogs([]);
+    try {
+      const res = await fetch("/api/system/db-config", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action: "save", config: form }),
+      });
+      const data = await res.json();
+      if (data.logs) setLogs(data.logs);
+      if (data.success) {
+        setSaveStatus("saved");
+        setTimeout(() => setSaveStatus("idle"), 3000);
+      } else {
+        setSaveStatus("error");
+      }
+    } catch (e: any) {
+      setSaveStatus("error");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading) {
+    return <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Lade Datenbank-Konfiguration...</div>;
+  }
+
+  return (
+    <div className="card">
+      <h2 className="settings-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+        <Database size={18} style={{ color: "var(--green)" }} /> Externe Datenbank-Konfiguration (UI)
+      </h2>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-4)" }}>
+        Verbinde deine eigene PostgreSQL-, MySQL- oder SQLite-Datenbank direkt über die App – ohne <code className="code">.env</code>-Dateien bearbeiten zu müssen.
+      </p>
+
+      {/* DB Type selector */}
+      <div className="input-group" style={{ marginBottom: "var(--space-4)" }}>
+        <label className="label">Datenbank-Typ</label>
+        <select
+          className="input"
+          style={{ maxWidth: "320px" }}
+          value={form.type}
+          onChange={(e) => {
+            const newType = e.target.value as "sqlite" | "postgresql" | "mysql";
+            setForm({
+              ...form,
+              type: newType,
+              port: newType === "postgresql" ? 5432 : newType === "mysql" ? 3306 : "",
+            });
+          }}
+        >
+          <option value="sqlite">SQLite (Lokale Datei)</option>
+          <option value="postgresql">PostgreSQL (Server)</option>
+          <option value="mysql">MySQL / MariaDB (Server)</option>
+        </select>
+      </div>
+
+      {form.type === "sqlite" ? (
+        <div style={{ padding: "var(--space-3) var(--space-4)", background: "var(--bg-surface)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: "var(--space-4)" }}>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
+            <strong>Lokale SQLite-Datenbank aktiv:</strong> <code className="code">./prisma/cryptotracker.db</code>
+          </div>
+        </div>
+      ) : (
+        <>
+          {/* Connection fields */}
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+            <div className="input-group">
+              <label className="label">Host / Server IP</label>
+              <input
+                type="text"
+                className="input"
+                placeholder={form.type === "postgresql" ? "localhost oder 192.168.1.100" : "localhost"}
+                value={form.host}
+                onChange={(e) => setForm({ ...form, host: e.target.value })}
+              />
+            </div>
+            <div className="input-group">
+              <label className="label">Port</label>
+              <input
+                type="number"
+                className="input"
+                placeholder={form.type === "postgresql" ? "5432" : "3306"}
+                value={form.port}
+                onChange={(e) => setForm({ ...form, port: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+            <div className="input-group">
+              <label className="label">Datenbank-Name</label>
+              <input
+                type="text"
+                className="input"
+                placeholder="cryptotracker"
+                value={form.database}
+                onChange={(e) => setForm({ ...form, database: e.target.value })}
+              />
+            </div>
+            <div className="input-group">
+              <label className="label">Benutzername</label>
+              <input
+                type="text"
+                className="input"
+                placeholder={form.type === "postgresql" ? "postgres" : "root"}
+                value={form.username}
+                onChange={(e) => setForm({ ...form, username: e.target.value })}
+              />
+            </div>
+            <div className="input-group">
+              <label className="label">
+                Passwort {form.hasPassword && <span style={{ color: "var(--green)", fontSize: "11px" }}>(hinterlegt)</span>}
+              </label>
+              <input
+                type="password"
+                className="input"
+                placeholder={form.hasPassword ? "•••••••• (unverändert)" : "Passwort"}
+                value={form.password}
+                onChange={(e) => setForm({ ...form, password: e.target.value })}
+              />
+            </div>
+          </div>
+
+          <div className="input-group" style={{ marginBottom: "var(--space-4)" }}>
+            <label className="label">Oder benutzerdefinierter Connection-String URL (Optional)</label>
+            <input
+              type="text"
+              className="input"
+              placeholder={form.type === "postgresql" ? "postgresql://user:pass@localhost:5432/db" : "mysql://user:pass@localhost:3306/db"}
+              value={form.url}
+              onChange={(e) => setForm({ ...form, url: e.target.value })}
+            />
+          </div>
+        </>
+      )}
+
+      {/* Test feedback */}
+      {testResult && (
+        <div
+          style={{
+            padding: "var(--space-3) var(--space-4)",
+            borderRadius: "var(--radius-md)",
+            marginBottom: "var(--space-4)",
+            fontSize: "var(--text-xs)",
+            background: testResult.success ? "rgba(34,197,94,0.1)" : "rgba(239,68,68,0.1)",
+            border: testResult.success ? "1px solid rgba(34,197,94,0.3)" : "1px solid rgba(239,68,68,0.3)",
+            color: testResult.success ? "#22c55e" : "#ef4444",
+          }}
+        >
+          {testResult.success ? testResult.message : testResult.error}
+        </div>
+      )}
+
+      {/* Buttons */}
+      <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center" }}>
+        {form.type !== "sqlite" && (
+          <button className="btn btn-secondary" onClick={handleTestConnection} disabled={testing}>
+            {testing ? "Verbindung wird geprüft..." : "Verbindung testen"}
+          </button>
+        )}
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? "Wird gespeichert..." : "Speichern & Verbinden"}
+        </button>
+        {saveStatus === "saved" && (
+          <span className="save-feedback success">
+            <CheckCircle size={14} /> Datenbank-Konfiguration gespeichert
+          </span>
+        )}
+      </div>
+
+      {logs.length > 0 && (
+        <div
+          style={{
+            marginTop: "var(--space-4)",
+            background: "var(--bg-surface)",
+            border: "1px solid var(--border)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3)",
+            fontFamily: "monospace",
+            fontSize: "12px",
+            color: "var(--text-secondary)",
+            maxHeight: "140px",
+            overflowY: "auto",
+          }}
+        >
+          <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>Sync Log:</div>
+          {logs.map((log, i) => (
+            <div key={i}>&gt; {log}</div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function EinstellungenPage() {
   const { data: session } = useSession();
   const user = session?.user as { name?: string; email?: string; currency?: string } | undefined;
@@ -1250,6 +1520,9 @@ export default function EinstellungenPage() {
           {/* ─── Datenbank & Export ──────────────────── */}
           {activeTab === "datenbank" && (
             <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+              {/* Interactive External DB Config */}
+              <DbConfigPanel />
+
               {/* DB-Info */}
               <div className="card">
                 <h2 className="settings-section-title">Datenbank-Status</h2>
