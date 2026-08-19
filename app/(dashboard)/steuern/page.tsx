@@ -4,7 +4,31 @@ import { useState, useEffect } from "react";
 import { formatCurrency } from "@/lib/mock/data";
 import { FileText, Download, Calculator, Info, Loader2 } from "lucide-react";
 import { downloadCSV, generateTaxPDF } from "@/lib/exportUtils";
-import { TaxResult } from "@/lib/tax/taxCalculator";
+import { TaxResult, TaxEvent } from "@/lib/tax/taxCalculator";
+
+const METHOD_DETAILS: Record<
+  "FIFO" | "LIFO" | "HIFO",
+  { title: string; subtitle: string; desc: string; taxTip: string }
+> = {
+  FIFO: {
+    title: "First In, First Out",
+    subtitle: "Zuerst gekauft = Zuerst verkauft",
+    desc: "Die ältesten erworbenen Krypto-Tranchen werden als Erstes veräußert.",
+    taxTip: "🇩🇪 In Deutschland der Standard gem. § 23 EStG. Optimal, um nach 365 Tagen Haltedauer die Steuerfreiheit zu erreichen.",
+  },
+  LIFO: {
+    title: "Last In, First Out",
+    subtitle: "Zuletzt gekauft = Zuerst verkauft",
+    desc: "Die neusten erworbenen Krypto-Tranchen werden als Erstes veräußert.",
+    taxTip: "📉 Nützlich bei fallenden Kursen, um jüngst teuer gekaufte Coins rasch mit Verlust zu verrechnen.",
+  },
+  HIFO: {
+    title: "Highest In, First Out",
+    subtitle: "Höchster Kaufpreis = Zuerst verkauft",
+    desc: "Die Tranchen mit den höchsten Anschaffungskosten werden als Erstes veräußert.",
+    taxTip: "⚡ Minimiert den steuerbaren Gewinn bzw. maximiert Verlustverrechnungen, da die teuersten Anschaffungen zuerst genutzt werden.",
+  },
+};
 
 export default function SteuernPage() {
   const [selectedYear, setSelectedYear] = useState("2024");
@@ -37,7 +61,7 @@ export default function SteuernPage() {
   function handleCSV() {
     setExporting("csv");
     downloadCSV(
-      events.map((e) => ({
+      events.map((e: TaxEvent) => ({
         Asset: e.asset,
         Kaufdatum: new Date(e.buyDate).toLocaleDateString("de-DE"),
         Verkaufsdatum: new Date(e.sellDate).toLocaleDateString("de-DE"),
@@ -109,28 +133,33 @@ export default function SteuernPage() {
 
         {/* Methode */}
         <div style={{ display: "flex", gap: "var(--space-2)" }}>
-          {(["FIFO", "LIFO", "HIFO"] as const).map((m) => (
-            <button
-              key={m}
-              onClick={() => setSelectedMethod(m)}
-              style={{
-                padding: "4px 14px", borderRadius: "var(--radius-md)",
-                fontSize: "var(--text-xs)", fontWeight: 700,
-                border: `1px solid ${selectedMethod === m ? "var(--green)" : "var(--border)"}`,
-                background: selectedMethod === m ? "var(--green-dim)" : "none",
-                color: selectedMethod === m ? "var(--green)" : "var(--text-muted)",
-                cursor: "pointer", fontFamily: "var(--font-mono)",
-                transition: "all var(--transition-fast)",
-              }}
-            >
-              {m}
-            </button>
-          ))}
+          {(["FIFO", "LIFO", "HIFO"] as const).map((m) => {
+            const details = METHOD_DETAILS[m];
+            return (
+              <div key={m} className="method-tooltip-wrap">
+                <button
+                  onClick={() => setSelectedMethod(m)}
+                  className={`method-btn ${selectedMethod === m ? "active" : ""}`}
+                >
+                  {m}
+                </button>
+                <div className="method-tooltip-card fade-in">
+                  <div className="tooltip-header">
+                    <span className="tooltip-title">{details.title}</span>
+                    <span className="tooltip-badge">{m}</span>
+                  </div>
+                  <div className="tooltip-subtitle">{details.subtitle}</div>
+                  <p className="tooltip-desc">{details.desc}</p>
+                  <div className="tooltip-tip">{details.taxTip}</div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
           <Info size={12} />
-          <span>{selectedMethod}-Methode aktiv · Steuerjahr {selectedYear}</span>
+          <span>{selectedMethod}-Methode aktiv &middot; Steuerjahr {selectedYear}</span>
         </div>
       </div>
 
@@ -164,7 +193,7 @@ export default function SteuernPage() {
                 <tr><th>Asset</th><th>Kaufdatum</th><th>Verkaufsdatum</th><th>Haltedauer</th><th>Einstandspreis</th><th>Erlöse</th><th>G&V</th><th>Typ</th></tr>
               </thead>
               <tbody>
-                {events.map((event, i) => (
+                {events.map((event: TaxEvent, i: number) => (
                   <tr key={`${event.asset}-${event.buyDate}-${event.sellDate}-${i}`}>
                     <td>
                       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
@@ -193,6 +222,85 @@ export default function SteuernPage() {
       </div>
 
       <style>{`
+        .method-tooltip-wrap { position: relative; display: inline-block; }
+        .method-btn {
+          padding: 4px 14px; borderRadius: var(--radius-md);
+          font-size: var(--text-xs); font-weight: 700;
+          border: 1px solid var(--border);
+          background: none; color: var(--text-muted);
+          cursor: pointer; font-family: var(--font-mono);
+          transition: all var(--transition-fast);
+        }
+        .method-btn:hover, .method-btn.active {
+          border-color: var(--green);
+          background: var(--green-dim);
+          color: var(--green);
+        }
+        .method-tooltip-card {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 50%;
+          transform: translateX(-50%) translateY(6px);
+          width: 270px;
+          padding: var(--space-3) var(--space-4);
+          background: var(--bg-card);
+          border: 1px solid var(--border-strong);
+          border-radius: var(--radius-lg);
+          box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+          pointer-events: none;
+          opacity: 0;
+          visibility: hidden;
+          transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+          z-index: 50;
+          text-align: left;
+        }
+        .method-tooltip-wrap:hover .method-tooltip-card {
+          opacity: 1;
+          visibility: visible;
+          transform: translateX(-50%) translateY(0);
+        }
+        .tooltip-header {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2px;
+        }
+        .tooltip-title {
+          font-size: var(--text-xs);
+          font-weight: 700;
+          color: var(--text-primary);
+        }
+        .tooltip-badge {
+          font-size: 10px;
+          font-family: var(--font-mono);
+          font-weight: 700;
+          padding: 1px 6px;
+          background: var(--green-dim);
+          color: var(--green);
+          border-radius: var(--radius-sm);
+          border: 1px solid rgba(16,185,129,0.2);
+        }
+        .tooltip-subtitle {
+          font-size: 11px;
+          font-weight: 600;
+          color: var(--green);
+          margin-bottom: var(--space-2);
+        }
+        .tooltip-desc {
+          font-size: 11px;
+          color: var(--text-secondary);
+          line-height: 1.4;
+          margin-bottom: var(--space-2);
+        }
+        .tooltip-tip {
+          font-size: 10px;
+          color: var(--text-muted);
+          background: var(--bg-muted);
+          padding: 6px 8px;
+          border-radius: var(--radius-sm);
+          border-left: 2px solid var(--green);
+          line-height: 1.35;
+        }
         .grid-4 { display:grid;grid-template-columns:repeat(4,1fr);gap:var(--space-4); }
         .tax-disclaimer { display:flex;align-items:flex-start;gap:var(--space-2);padding:var(--space-4);margin-top:var(--space-5);background:var(--bg-muted);border-radius:var(--radius-md);font-size:var(--text-xs);color:var(--text-secondary);border:1px solid var(--border); }
         .tax-disclaimer svg { flex-shrink:0;margin-top:1px;color:var(--text-muted); }

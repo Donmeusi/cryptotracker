@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import {
   User, Shield, Database, Bell, Palette, ChevronRight,
-  CheckCircle, Download,
+  CheckCircle, Download, LayoutGrid, Layers, Image as ImageIcon,
 } from "lucide-react";
 import { downloadCSV, downloadJSON } from "@/lib/exportUtils";
 import { MOCK_HOLDINGS, MOCK_ASSETS, generateMockTrades, MOCK_DEFI_POSITIONS, MOCK_NFTS } from "@/lib/mock/data";
@@ -17,12 +17,13 @@ const WAEHRUNGEN = [
   { code: "JPY", name: "Japanischer Yen (¥)" },
 ];
 
-type Tab = "profil" | "sicherheit" | "erscheinungsbild" | "benachrichtigungen" | "datenbank";
+type Tab = "profil" | "sicherheit" | "erscheinungsbild" | "module" | "benachrichtigungen" | "datenbank";
 
 const NAV_ITEMS: { id: Tab; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
   { id: "profil", icon: User, label: "Profil" },
   { id: "sicherheit", icon: Shield, label: "Sicherheit" },
   { id: "erscheinungsbild", icon: Palette, label: "Erscheinungsbild" },
+  { id: "module", icon: LayoutGrid, label: "Module & Funktionen" },
   { id: "benachrichtigungen", icon: Bell, label: "Benachrichtigungen" },
   { id: "datenbank", icon: Database, label: "Datenbank & Export" },
 ];
@@ -324,6 +325,130 @@ function AppearancePanel() {
   );
 }
 
+function ModulePanel() {
+  const [showDefi, setShowDefi] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ct-module-defi") !== "false";
+    }
+    return true;
+  });
+  const [showNfts, setShowNfts] = useState<boolean>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("ct-module-nfts") !== "false";
+    }
+    return true;
+  });
+  const [saved, setSaved] = useState(false);
+
+  function handleToggle(module: "defi" | "nfts", val: boolean) {
+    if (module === "defi") {
+      setShowDefi(val);
+      localStorage.setItem("ct-module-defi", String(val));
+    } else {
+      setShowNfts(val);
+      localStorage.setItem("ct-module-nfts", String(val));
+    }
+    window.dispatchEvent(new Event("ct-modules-changed"));
+    setSaved(true);
+    setTimeout(() => setSaved(false), 2000);
+  }
+
+  return (
+    <div className="card fade-in">
+      <h2 className="settings-section-title">Module & Funktionen</h2>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-6)" }}>
+        Aktiviere oder deaktiviere einzelne Funktionsbereiche. Deaktivierte Module werden in der Seitenleiste ausgeblendet.
+      </p>
+
+      <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
+        {/* DeFi Modul */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "var(--space-4) var(--space-5)", background: "var(--bg-surface)",
+          borderRadius: "var(--radius-lg)", border: "1px solid var(--border)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: "var(--radius-md)",
+              background: showDefi ? "var(--green-dim)" : "var(--bg-muted)",
+              border: `1px solid ${showDefi ? "rgba(16,185,129,0.3)" : "var(--border)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: showDefi ? "var(--green)" : "var(--text-muted)",
+              transition: "all var(--transition-fast)"
+            }}>
+              <Layers size={20} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <span style={{ fontWeight: 600, fontSize: "var(--text-base)", color: "var(--text-primary)" }}>DeFi-Bereich</span>
+                <span className={`badge ${showDefi ? "badge-green" : "badge-gold"}`} style={{ fontSize: "10px" }}>
+                  {showDefi ? "Aktiv" : "Deaktiviert"}
+                </span>
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
+                Anzeige von Staking-Positionen, Liquidity Pools & Lending (`/defi`)
+              </div>
+            </div>
+          </div>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={showDefi}
+              onChange={(e) => handleToggle("defi", e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+
+        {/* NFT Modul */}
+        <div style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+          padding: "var(--space-4) var(--space-5)", background: "var(--bg-surface)",
+          borderRadius: "var(--radius-lg)", border: "1px solid var(--border)"
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)" }}>
+            <div style={{
+              width: 40, height: 40, borderRadius: "var(--radius-md)",
+              background: showNfts ? "var(--green-dim)" : "var(--bg-muted)",
+              border: `1px solid ${showNfts ? "rgba(16,185,129,0.3)" : "var(--border)"}`,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              color: showNfts ? "var(--green)" : "var(--text-muted)",
+              transition: "all var(--transition-fast)"
+            }}>
+              <ImageIcon size={20} />
+            </div>
+            <div>
+              <div style={{ display: "flex", alignItems: "center", gap: "var(--space-2)" }}>
+                <span style={{ fontWeight: 600, fontSize: "var(--text-base)", color: "var(--text-primary)" }}>NFT-Bereich</span>
+                <span className={`badge ${showNfts ? "badge-green" : "badge-gold"}`} style={{ fontSize: "10px" }}>
+                  {showNfts ? "Aktiv" : "Deaktiviert"}
+                </span>
+              </div>
+              <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
+                Verwaltung von NFT-Kollektionen & Floor-Preisen (`/nfts`)
+              </div>
+            </div>
+          </div>
+          <label className="toggle">
+            <input
+              type="checkbox"
+              checked={showNfts}
+              onChange={(e) => handleToggle("nfts", e.target.checked)}
+            />
+            <span className="toggle-track"><span className="toggle-thumb" /></span>
+          </label>
+        </div>
+      </div>
+
+      {saved && (
+        <div style={{ marginTop: "var(--space-5)", display: "flex", alignItems: "center", gap: 6, color: "var(--green)", fontSize: "var(--text-sm)", fontWeight: 500 }}>
+          <CheckCircle size={14} /> Einstellungen übernommen – Seitenleiste aktualisiert
+        </div>
+      )}
+    </div>
+  );
+}
+
 type NotificationSettings = {
   priceAlerts: boolean;
   portfolioSummary: boolean;
@@ -553,6 +678,167 @@ function NotificationsPanel({ userEmail }: { userEmail?: string }) {
   );
 }
 
+type OidcFormState = {
+  enabled: boolean;
+  issuer: string;
+  clientId: string;
+  clientSecret: string;
+  clientName: string;
+  hasSecret?: boolean;
+};
+
+function OidcSettingsPanel() {
+  const [form, setForm] = useState<OidcFormState>({
+    enabled: false,
+    issuer: "",
+    clientId: "",
+    clientSecret: "",
+    clientName: "Single Sign-On",
+  });
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/auth/oidc-config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error) {
+          setForm({
+            enabled: Boolean(data.enabled),
+            issuer: data.issuer || "",
+            clientId: data.clientId || "",
+            clientSecret: "",
+            clientName: data.clientName || "Pocket-ID / SSO",
+            hasSecret: Boolean(data.hasSecret),
+          });
+        }
+        setLoading(false);
+      })
+      .catch(() => setLoading(false));
+  }, []);
+
+  async function handleSave() {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/auth/oidc-config", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(form),
+      });
+      if (res.ok) {
+        setSaved(true);
+        setTimeout(() => setSaved(false), 2500);
+      }
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  if (loading) {
+    return <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Lade OIDC Einstellungen...</div>;
+  }
+
+  return (
+    <div style={{ marginTop: "var(--space-2)" }}>
+      <h2 className="settings-section-title">
+        Single Sign-On (OIDC / Pocket-ID / Keycloak / Authentik)
+      </h2>
+      <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-4)" }}>
+        Konfiguriere deinen eigenen OpenID Connect Provider direkt über die UI.
+      </p>
+
+      {/* Enable toggle */}
+      <div style={{
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "var(--space-4)", background: "var(--bg-surface)",
+        borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: "var(--space-4)"
+      }}>
+        <div>
+          <div style={{ fontWeight: 600, fontSize: "var(--text-sm)", color: "var(--text-primary)" }}>
+            OIDC / SSO Login aktivieren
+          </div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
+            Zeigt den SSO-Login Button auf der Anmeldeseite an
+          </div>
+        </div>
+        <label className="toggle">
+          <input
+            type="checkbox"
+            checked={form.enabled}
+            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
+          />
+          <span className="toggle-track"><span className="toggle-thumb" /></span>
+        </label>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div className="input-group">
+          <label className="label">Anzeige-Name auf Login-Button</label>
+          <input
+            type="text"
+            className="input"
+            placeholder="z.B. Pocket-ID oder Keycloak"
+            value={form.clientName}
+            onChange={(e) => setForm({ ...form, clientName: e.target.value })}
+          />
+        </div>
+        <div className="input-group">
+          <label className="label">OIDC Issuer URL (Server-Adresse)</label>
+          <input
+            type="text"
+            className="input"
+            placeholder="http://localhost:8080 oder https://auth.deine-domain.de"
+            value={form.issuer}
+            onChange={(e) => setForm({ ...form, issuer: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
+        <div className="input-group">
+          <label className="label">Client ID</label>
+          <input
+            type="text"
+            className="input"
+            placeholder="z.B. cryptotracker"
+            value={form.clientId}
+            onChange={(e) => setForm({ ...form, clientId: e.target.value })}
+          />
+        </div>
+        <div className="input-group">
+          <label className="label">
+            Client Secret {form.hasSecret && <span style={{ color: "var(--green)", fontSize: "11px" }}>(bereits hinterlegt)</span>}
+          </label>
+          <input
+            type="password"
+            className="input"
+            placeholder={form.hasSecret ? "•••••••• (unverändert lassen)" : "Geheimes Secret"}
+            value={form.clientSecret}
+            onChange={(e) => setForm({ ...form, clientSecret: e.target.value })}
+          />
+        </div>
+      </div>
+
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", background: "var(--bg-surface)", padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: "var(--space-4)" }}>
+        <div><strong>Wichtig – Redirect-URI im OIDC Provider eintragen:</strong></div>
+        <code className="code" style={{ marginTop: 4, display: "inline-block" }}>http://localhost:3000/api/auth/callback/oidc</code>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
+          {saving ? "Wird gespeichert..." : "OIDC Einstellungen speichern"}
+        </button>
+        {saved && (
+          <span className="save-feedback success">
+            <CheckCircle size={14} /> OIDC Konfiguration gespeichert & aktiv
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function EinstellungenPage() {
   const { data: session } = useSession();
   const user = session?.user as { name?: string; email?: string; currency?: string } | undefined;
@@ -678,6 +964,10 @@ export default function EinstellungenPage() {
 
               <div className="divider" />
 
+              <OidcSettingsPanel />
+
+              <div className="divider" />
+
               <h2 className="settings-section-title" style={{ marginTop: "var(--space-2)" }}>
                 Sitzungen
               </h2>
@@ -698,6 +988,11 @@ export default function EinstellungenPage() {
           {/* ─── Erscheinungsbild ────────────────────── */}
           {activeTab === "erscheinungsbild" && (
             <AppearancePanel />
+          )}
+
+          {/* ─── Module & Funktionen ────────────────── */}
+          {activeTab === "module" && (
+            <ModulePanel />
           )}
 
           {/* ─── Benachrichtigungen ──────────────────── */}

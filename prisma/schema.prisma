@@ -288,3 +288,17 @@ model NotificationSettings {
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
+
+// ─── OIDC / SSO Configuration ─────────────────────────────────────
+
+model OidcSettings {
+  id           String   @id @default("default")
+  enabled      Boolean  @default(false)
+  issuer       String?
+  clientId     String?
+  clientSecret String?
+  clientName   String   @default("Single Sign-On")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+

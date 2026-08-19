@@ -19,7 +19,9 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
 | 💼 **Assets Tracker** | CRUD für alle Krypto-Positionen, Live-Preise, PnL pro Asset |
 | 🖼️ **NFT Manager** | Manuelle NFT-Erfassung mit Floor-Preis und Collection-Tracking |
 | 📈 **Trade-Historie** | Vollständige Transaktionsübersicht mit Filter, PDF-Import, Edit & Delete |
-| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Haltedauer-Kennzeichnung (> 365 Tage steuerfrei), PDF + CSV Export |
+| 🔑 **OIDC / SSO Integration** | Universal OpenID Connect Support (Pocket-ID, Keycloak, Authentik, Authelia, Zitadel) mit UI-basierter Verwaltung |
+| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Hover-Erklärungs-Tooltips, Haltedauer (> 365 Tage steuerfrei), PDF + CSV Export |
+| 🎛️ **Modul-Steuerung** | Flexibles Ein- & Ausblenden von Bereichen (DeFi, NFTs) in der Seitenleiste über Einstellungen |
 | 🏛️ **Börsen-Anbindung** | API-Key Verwaltung für Binance, Kraken, Coinbase, OKX, Bybit |
 | 🎨 **Themes & Personalisierung** | 4 Themes (Dark, Midnight, Light, Forest) + 5 Akzentfarben, dynamisches `color-scheme` |
 

@@ -1,10 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { signIn } from "next-auth/react";
-import { TrendingUp, Mail, Lock, AlertCircle, Loader2 } from "lucide-react";
+import { TrendingUp, Mail, Lock, AlertCircle, Loader2, ShieldCheck } from "lucide-react";
 
 export default function AnmeldenPage() {
   const router = useRouter();
@@ -12,6 +12,18 @@ export default function AnmeldenPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  const [oidcConfig, setOidcConfig] = useState<{ enabled: boolean; clientName: string } | null>(null);
+
+  useEffect(() => {
+    fetch("/api/auth/oidc-config")
+      .then((res) => res.json())
+      .then((data) => {
+        if (!data.error && data.enabled) {
+          setOidcConfig({ enabled: true, clientName: data.clientName || "Single Sign-On" });
+        }
+      })
+      .catch(() => {});
+  }, []);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -48,6 +60,32 @@ export default function AnmeldenPage() {
         <h1 className="auth-title">Willkommen zurück</h1>
         <p className="auth-desc">Melde dich bei deinem Portfolio an</p>
       </div>
+
+      {/* OIDC / SSO Button */}
+      {oidcConfig?.enabled && (
+        <div style={{ marginBottom: "var(--space-5)" }}>
+          <button
+            type="button"
+            className="btn btn-secondary btn-lg"
+            style={{
+              width: "100%",
+              justifyContent: "center",
+              gap: 10,
+              border: "1px solid var(--border-strong)",
+              background: "var(--bg-elevated)",
+            }}
+            onClick={() => signIn("oidc", { callbackUrl: "/dashboard" })}
+          >
+            <ShieldCheck size={18} style={{ color: "var(--green)" }} />
+            <span>Mit {oidcConfig.clientName} anmelden</span>
+          </button>
+          <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", marginTop: "var(--space-5)" }}>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+            <span style={{ fontSize: "11px", color: "var(--text-muted)", textTransform: "uppercase", letterSpacing: "0.08em" }}>oder E-Mail</span>
+            <div style={{ flex: 1, height: 1, background: "var(--border)" }} />
+          </div>
+        </div>
+      )}
 
       <form onSubmit={handleSubmit} className="auth-form">
         {error && (

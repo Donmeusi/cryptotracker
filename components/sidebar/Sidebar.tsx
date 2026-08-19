@@ -34,11 +34,30 @@ const NAV_ITEMS = [
 export default function Sidebar() {
   const pathname = usePathname();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [showDefi, setShowDefi] = useState(true);
+  const [showNfts, setShowNfts] = useState(true);
 
   // Close mobile drawer on route change
   useEffect(() => {
     setMobileOpen(false);
   }, [pathname]);
+
+  // Sync module visibility settings
+  useEffect(() => {
+    function syncModules() {
+      setShowDefi(localStorage.getItem("ct-module-defi") !== "false");
+      setShowNfts(localStorage.getItem("ct-module-nfts") !== "false");
+    }
+    syncModules();
+    window.addEventListener("ct-modules-changed", syncModules);
+    return () => window.removeEventListener("ct-modules-changed", syncModules);
+  }, []);
+
+  const connectorItems = [
+    { href: "/boersen", icon: ArrowLeftRight, label: "Börsen" },
+    ...(showDefi ? [{ href: "/defi", icon: Layers, label: "DeFi" }] : []),
+    ...(showNfts ? [{ href: "/nfts", icon: Image, label: "NFTs" }] : []),
+  ];
 
   return (
     <>
@@ -89,10 +108,14 @@ export default function Sidebar() {
             <NavItem key={item.href} {...item} active={pathname === item.href} />
           ))}
 
-          <div className="nav-section-label">Konnektoren</div>
-          {NAV_ITEMS.slice(2, 5).map((item) => (
-            <NavItem key={item.href} {...item} active={pathname === item.href} />
-          ))}
+          {connectorItems.length > 0 && (
+            <>
+              <div className="nav-section-label">Konnektoren</div>
+              {connectorItems.map((item) => (
+                <NavItem key={item.href} {...item} active={pathname === item.href} />
+              ))}
+            </>
+          )}
 
           <div className="nav-section-label">Berichte</div>
           {NAV_ITEMS.slice(5).map((item) => (

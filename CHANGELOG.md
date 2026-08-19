@@ -4,6 +4,18 @@ Alle wichtigen Änderungen am Projekt **CryptoTracker** werden in dieser Datei d
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [v0.3.0] - 2026-08-19
+
+### ✨ Hinzugefügt (Added)
+- **Universal OIDC / Single Sign-On (SSO) Support**:
+  - Unterstützung für OpenID Connect Identity Provider (Pocket-ID, Keycloak, Authentik, Authelia, Zitadel, Auth0, etc.).
+  - UI-basierte Verwaltung unter *Einstellungen → Sicherheit*: OIDC-Aktivierung, Issuer URL, Client ID, Client Secret und individueller Provider-Name direkt steuerbar.
+  - Dynamischer SSO-Login Button auf der Anmeldeseite (`/anmelden`).
+- **Erklärungs-Tooltips für Steuerberichte (`/steuern`)**:
+  - Interaktive Hover-Tooltips für FIFO, LIFO und HIFO Methoden mit steuerlichen Erläuterungen (§ 23 EStG, 1-jährige Haltefrist & Verlustverrechnung).
+- **Modul-Verwaltung (`/einstellungen`)**:
+  - Neuer Menüpunkt *Module & Funktionen* in den Einstellungen zum flexiblen Ein- und Ausblenden der Bereiche DeFi (`/defi`) und NFTs (`/nfts`) in der Seitenleiste in Echtzeit.
+
 ---
 
 ## [v0.2.0] - 2026-08-05

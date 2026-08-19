@@ -1,8 +1,9 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import Link from "next/link";
 import { MOCK_NFTS } from "@/lib/mock/data";
-import { Image as ImageIcon, TrendingUp, TrendingDown, Plus, X, CheckCircle, Edit2, Trash2 } from "lucide-react";
+import { Image as ImageIcon, TrendingUp, TrendingDown, Plus, X, CheckCircle, Edit2, Trash2, Settings } from "lucide-react";
 
 interface NewNFT {
   name: string; collection: string; tokenId: string; purchasePrice: string; floorPrice: string;
@@ -10,12 +11,38 @@ interface NewNFT {
 const EMPTY_NFT: NewNFT = { name: "", collection: "", tokenId: "", purchasePrice: "", floorPrice: "" };
 
 export default function NFTsPage() {
+  const [enabled, setEnabled] = useState(true);
   const [nfts, setNfts] = useState<typeof MOCK_NFTS>(() => [...MOCK_NFTS]);
   const [editId, setEditId] = useState<string | null>(null);
   const [showModal, setShowModal] = useState(false);
   const [form, setForm] = useState<NewNFT>(EMPTY_NFT);
   const [formError, setFormError] = useState("");
   const [saved, setSaved] = useState(false);
+
+  useEffect(() => {
+    setEnabled(localStorage.getItem("ct-module-nfts") !== "false");
+  }, []);
+
+  if (!enabled) {
+    return (
+      <div className="page-container fade-in">
+        <div className="card" style={{ textAlign: "center", padding: "var(--space-12) var(--space-6)" }}>
+          <div style={{ width: 56, height: 56, borderRadius: "50%", background: "var(--bg-muted)", display: "inline-flex", alignItems: "center", justifyContent: "center", color: "var(--text-muted)", margin: "0 auto var(--space-4)" }}>
+            <ImageIcon size={28} />
+          </div>
+          <h2 style={{ fontSize: "var(--text-xl)", fontWeight: 700, color: "var(--text-primary)", marginBottom: "var(--space-2)" }}>
+            NFT-Modul ist deaktiviert
+          </h2>
+          <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", maxWidth: 460, margin: "0 auto var(--space-6)" }}>
+            Dieses Modul wurde in deinen Einstellungen ausgeblendet. Du kannst es unter <strong>Einstellungen &rarr; Module & Funktionen</strong> jederzeit wieder aktivieren.
+          </p>
+          <Link href="/einstellungen" className="btn btn-primary" style={{ display: "inline-flex" }}>
+            <Settings size={15} /> Zu den Einstellungen
+          </Link>
+        </div>
+      </div>
+    );
+  }
 
   const totalFloorValue = nfts.reduce((s, n) => s + n.floorPrice, 0);
   const totalCostBasis = nfts.reduce((s, n) => s + n.purchasePrice, 0);
