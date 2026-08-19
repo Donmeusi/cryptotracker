@@ -207,8 +207,8 @@ export default function TradesPage() {
       {/* Header */}
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "var(--space-8)" }}>
         <div>
-          <h1 className="page-title">Trade-Verlauf</h1>
-          <p className="page-subtitle">Alle deine Transaktionen im Überblick</p>
+          <h1 className="page-title">Trade-Verlauf & Berichte</h1>
+          <p className="page-subtitle">Transaktions-Bericht & Auswertungsübersicht (Erfassung unter &apos;Assets&apos;)</p>
         </div>
         <div style={{ display: "flex", gap: "var(--space-3)" }}>
           <button
@@ -228,23 +228,6 @@ export default function TradesPage() {
           >
             {pdfExporting ? <Loader2 size={15} className="spin" /> : <FileText size={15} />}
             PDF Export
-          </button>
-          <button
-            className="btn btn-secondary"
-            id="trades-pdf-import"
-            onClick={() => setShowPdfModal(true)}
-            style={{ borderColor: "rgba(16, 185, 129, 0.4)", color: "#10b981" }}
-          >
-            <UploadCloud size={15} />
-            PDF Import
-          </button>
-          <button
-            className="btn btn-primary"
-            id="trades-add-manual"
-            onClick={() => { setEditId(null); setForm(EMPTY_FORM); setShowModal(true); }}
-          >
-            <Plus size={15} />
-            Trade manuell erfassen
           </button>
         </div>
       </div>

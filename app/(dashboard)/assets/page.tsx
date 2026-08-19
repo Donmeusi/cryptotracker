@@ -2,24 +2,48 @@
 
 import { useState, useMemo } from "react";
 import { MOCK_ASSETS, MOCK_HOLDINGS, formatCurrency, formatPercent } from "@/lib/mock/data";
-import { Plus, Search, X, Loader2, AlertCircle, Edit2, Trash2 } from "lucide-react";
+import { Plus, Search, X, Loader2, AlertCircle, Edit2, Trash2, UploadCloud } from "lucide-react";
 import { useLivePrices } from "@/lib/hooks/useLivePrices";
+import PdfImportModal from "@/components/trades/PdfImportModal";
+import { ParsedTrade } from "@/app/api/trades/parse-pdf/route";
 
 const TYPE_OPTIONS = ["CRYPTO", "DEFI", "NFT", "STOCK"];
+const TRADE_TYPES = [
+  { value: "BUY", label: "Kauf (BUY)" },
+  { value: "SELL", label: "Verkauf (SELL)" },
+  { value: "TRANSFER_IN", label: "Eingang (Transfer In)" },
+  { value: "STAKING_REWARD", label: "Staking Reward" },
+];
+const EXCHANGES = ["Binance", "Kraken", "Trade Republic", "Coinbase", "Bitpanda", "Bison", "Sonstige"];
 
 interface NewAsset {
   symbol: string;
   name: string;
   type: string;
+  tradeType: string;
   amount: string;
   avgBuyPrice: string;
   buyDate: string;
+  exchange: string;
+  notes: string;
 }
-const EMPTY: NewAsset = { symbol: "", name: "", type: "CRYPTO", amount: "", avgBuyPrice: "", buyDate: new Date().toISOString().slice(0, 10) };
+
+const EMPTY: NewAsset = {
+  symbol: "",
+  name: "",
+  type: "CRYPTO",
+  tradeType: "BUY",
+  amount: "",
+  avgBuyPrice: "",
+  buyDate: new Date().toISOString().slice(0, 10),
+  exchange: "Binance",
+  notes: "",
+};
 
 export default function AssetsPage() {
   const [search, setSearch] = useState("");
   const [showModal, setShowModal] = useState(false);
+  const [showPdfModal, setShowPdfModal] = useState(false);
   const [form, setForm] = useState<NewAsset>(EMPTY);
   const [formError, setFormError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -52,6 +76,39 @@ export default function AssetsPage() {
 
   const totalValue = enriched.reduce((s, e) => s + e.marketValue, 0);
   const totalPnl = totalValue - enriched.reduce((s, e) => s + e.costBasis, 0);
+
+  function handleBatchImportPdf(importedTrades: ParsedTrade[]) {
+    setHoldings((prev) => {
+      let updated = [...prev];
+      for (const t of importedTrades) {
+        const sym = (t.asset || "BTC").toUpperCase();
+        const amount = Number(t.amount) || 0;
+        const price = Number(t.price) || 0;
+        const buyDate = t.executedAt ? t.executedAt.slice(0, 10) : new Date().toISOString().slice(0, 10);
+
+        const existingIndex = updated.findIndex((h) => h.symbol === sym);
+        if (existingIndex >= 0) {
+          const existing = updated[existingIndex];
+          const newAmount = existing.amount + amount;
+          const newAvg = newAmount > 0 ? ((existing.amount * existing.avgBuyPrice) + (amount * price)) / newAmount : existing.avgBuyPrice;
+          updated[existingIndex] = {
+            ...existing,
+            amount: newAmount,
+            avgBuyPrice: newAvg,
+            buyDate: buyDate,
+          };
+        } else {
+          updated.unshift({
+            symbol: sym,
+            amount,
+            avgBuyPrice: price,
+            buyDate,
+          });
+        }
+      }
+      return updated;
+    });
+  }
 
   function handleSubmit(ev: React.FormEvent) {
     ev.preventDefault();
@@ -86,9 +143,12 @@ export default function AssetsPage() {
       symbol: item.symbol,
       name: item.asset.name || "",
       type: "CRYPTO",
+      tradeType: "BUY",
       amount: item.amount.toString(),
       avgBuyPrice: item.avgBuyPrice.toString(),
       buyDate: item.buyDate || new Date().toISOString().slice(0, 10),
+      exchange: "Binance",
+      notes: "",
     });
     setEditSymbol(item.symbol);
     setShowModal(true);
@@ -105,15 +165,28 @@ export default function AssetsPage() {
       <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", marginBottom: "var(--space-8)" }}>
         <div>
           <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-            <h1 className="page-title">Assets</h1>
+            <h1 className="page-title">Assets & Trade-Erfassung</h1>
             {isLoading && <Loader2 size={16} className="spin text-muted" />}
             {isFallback && !isLoading && <div title="CoinGecko Rate Limit - Verwende lokale Preise" style={{ color: "var(--red)" }}><AlertCircle size={16} /></div>}
           </div>
-          <p className="page-subtitle">Dein gesamtes Krypto-Portfolio verwalten</p>
+          <p className="page-subtitle">Verwalte dein Krypto-Portfolio & erfasse neue Transaktionen und Positionen</p>
         </div>
-        <button id="assets-add-btn" className="btn btn-primary" onClick={() => { setEditSymbol(null); setForm(EMPTY); setShowModal(true); }}>
-          <Plus size={15} /> Asset hinzufügen
-        </button>
+        <div style={{ display: "flex", gap: "var(--space-3)" }}>
+          <button
+            className="btn btn-secondary"
+            onClick={() => setShowPdfModal(true)}
+            style={{ borderColor: "rgba(16, 185, 129, 0.4)", color: "#10b981" }}
+          >
+            <UploadCloud size={15} /> PDF Trade-Import
+          </button>
+          <button
+            id="assets-add-btn"
+            className="btn btn-primary"
+            onClick={() => { setEditSymbol(null); setForm(EMPTY); setShowModal(true); }}
+          >
+            <Plus size={15} /> Trade / Position erfassen
+          </button>
+        </div>
       </div>
 
       <div className="grid-3" style={{ marginBottom: "var(--space-6)" }}>
@@ -198,20 +271,31 @@ export default function AssetsPage() {
         )}
       </div>
 
-      {/* Modal */}
+      {/* PDF Import Modal */}
+      <PdfImportModal
+        isOpen={showPdfModal}
+        onClose={() => setShowPdfModal(false)}
+        onImportTrades={handleBatchImportPdf}
+      />
+
+      {/* Trade / Asset Modal */}
       {showModal && (
         <div className="modal-overlay" onClick={() => { setShowModal(false); setForm(EMPTY); setFormError(""); setEditSymbol(null); }}>
           <div className="modal" onClick={(e) => e.stopPropagation()}>
             <div className="modal-header">
-              <div><h2 className="modal-title">{editSymbol ? "Asset bearbeiten" : "Asset hinzufügen"}</h2><p className="modal-subtitle">{editSymbol ? "Bestehende Position anpassen" : "Neue Position manuell erfassen"}</p></div>
+              <div>
+                <h2 className="modal-title">{editSymbol ? "Position bearbeiten" : "Trade / Position erfassen"}</h2>
+                <p className="modal-subtitle">{editSymbol ? "Bestehende Position anpassen" : "Neue Krypto-Transaktion oder Position manuell erfassen"}</p>
+              </div>
               <button className="modal-close" onClick={() => { setShowModal(false); setForm(EMPTY); setFormError(""); setEditSymbol(null); }}><X size={18} /></button>
             </div>
             <form onSubmit={handleSubmit} className="modal-body">
               {formError && <div className="form-error"><span>⚠</span> {formError}</div>}
-              {saved && <div className="form-success"><span>✓</span> Asset gespeichert!</div>}
+              {saved && <div className="form-success"><span>✓</span> Position erfolgreich gespeichert!</div>}
+              
               <div className="form-grid-2">
                 <div className="input-group">
-                  <label className="label" htmlFor="a-symbol">Symbol *</label>
+                  <label className="label" htmlFor="a-symbol">Symbol / Asset *</label>
                   <input id="a-symbol" className="input mono" placeholder="z.B. BTC" value={form.symbol} onChange={(e) => { setForm((p) => ({ ...p, symbol: e.target.value })); setFormError(""); }} />
                 </div>
                 <div className="input-group">
@@ -219,29 +303,43 @@ export default function AssetsPage() {
                   <input id="a-name" className="input" placeholder="z.B. Bitcoin" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
                 </div>
                 <div className="input-group">
-                  <label className="label" htmlFor="a-amount">Bestand *</label>
+                  <label className="label" htmlFor="a-trade-type">Transaktions-Typ</label>
+                  <select id="a-trade-type" className="input" value={form.tradeType} onChange={(e) => setForm((p) => ({ ...p, tradeType: e.target.value }))}>
+                    {TRADE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="a-amount">Menge / Bestand *</label>
                   <input id="a-amount" type="number" step="any" min="0" className="input mono" placeholder="z.B. 0.5" value={form.amount} onChange={(e) => { setForm((p) => ({ ...p, amount: e.target.value })); setFormError(""); }} />
                 </div>
                 <div className="input-group">
-                  <label className="label" htmlFor="a-price">Ø Kaufkurs (EUR) *</label>
+                  <label className="label" htmlFor="a-price">Kaufkurs / Preis (EUR) *</label>
                   <input id="a-price" type="number" step="any" min="0" className="input mono" placeholder="z.B. 45000" value={form.avgBuyPrice} onChange={(e) => { setForm((p) => ({ ...p, avgBuyPrice: e.target.value })); setFormError(""); }} />
                 </div>
-              </div>
-              <div className="form-grid-2">
                 <div className="input-group">
-                  <label className="label" htmlFor="a-date">Kaufdatum *</label>
+                  <label className="label" htmlFor="a-date">Kaufdatum / Datum *</label>
                   <input id="a-date" type="date" className="input mono" value={form.buyDate} onChange={(e) => setForm((p) => ({ ...p, buyDate: e.target.value }))} />
                 </div>
+              </div>
+
+              <div className="form-grid-2">
                 <div className="input-group">
-                  <label className="label" htmlFor="a-type">Asset-Typ</label>
+                  <label className="label" htmlFor="a-exchange">Börse / Handelsplatz</label>
+                  <select id="a-exchange" className="input" value={form.exchange} onChange={(e) => setForm((p) => ({ ...p, exchange: e.target.value }))}>
+                    {EXCHANGES.map((ex) => <option key={ex} value={ex}>{ex}</option>)}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="a-type">Asset-Kategorie</label>
                   <select id="a-type" className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
                     {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
+
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setForm(EMPTY); setFormError(""); setEditSymbol(null); }}>Abbrechen</button>
-                <button type="submit" className="btn btn-primary" disabled={saved}><Plus size={15} />{saved ? "Gespeichert!" : (editSymbol ? "Änderungen speichern" : "Asset speichern")}</button>
+                <button type="submit" className="btn btn-primary" disabled={saved}><Plus size={15} />{saved ? "Gespeichert!" : (editSymbol ? "Änderungen speichern" : "Position speichern")}</button>
               </div>
             </form>
           </div>
@@ -250,7 +348,7 @@ export default function AssetsPage() {
 
       <style>{`
         .modal-overlay { position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:var(--space-4);animation:fadeIn .15s ease; }
-        .modal { background:var(--bg-card);border:1px solid var(--border-strong);border-radius:var(--radius-xl);width:100%;max-width:500px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp .2s ease; }
+        .modal { background:var(--bg-card);border:1px solid var(--border-strong);border-radius:var(--radius-xl);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg);animation:slideUp .2s ease; }
         @keyframes slideUp { from{transform:translateY(16px);opacity:0} to{transform:translateY(0);opacity:1} }
         .modal-header { display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-6) var(--space-6) var(--space-4);border-bottom:1px solid var(--border); }
         .modal-title { font-size:var(--text-xl);font-weight:700;color:var(--text-primary); }
