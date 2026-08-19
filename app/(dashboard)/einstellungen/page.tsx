@@ -1207,7 +1207,7 @@ function DbConfigPanel() {
         <Database size={18} style={{ color: "var(--green)" }} /> Externe Datenbank-Konfiguration (UI)
       </h2>
       <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-4)" }}>
-        Verbinde deine eigene PostgreSQL-, MySQL- oder SQLite-Datenbank direkt über die App – ohne <code className="code">.env</code>-Dateien bearbeiten zu müssen.
+        Verbinde deine eigene PostgreSQL-, MySQL- oder SQLite-Datenbank.
       </p>
 
       {/* DB Type selector */}

@@ -1,6 +1,6 @@
 # Externe Datenbank-Konfiguration (PostgreSQL, MySQL, SQLite)
 
-CryptoTracker erlaubt es, externe Datenbank-Server direkt über die Benutzeroberfläche anzubinden – ganz ohne manuelle Anpassungen an `.env`-Dateien.
+CryptoTracker erlaubt es, externe Datenbank-Server direkt über die Benutzeroberfläche anzubinden.
 
 ---
 
