@@ -107,6 +107,13 @@ npm run dev
 
 ---
 
+## 📚 Dokumentation, Wiki & DSGVO / TOM
+
+* 📖 **[GitHub Wiki](https://github.com/Donmeusi/cryptotracker/wiki):** Vollständige Anleitungen zu Installation, OIDC, Datenbanken, Updates & Steuern.
+* 🛡️ **[Technische Systemdokumentation & TOM (Art. 32 DSGVO)](docs/SYSTEMDOKUMENTATION_UND_TOM.md):** Ausführliche Systemdokumentation und Technisch-Organisatorische Maßnahmen zur Datensicherheit gemäß Art. 32 DSGVO.
+
+---
+
 ## 📄 Lizenz
 
 Dieses Projekt ist unter der **[MIT-Lizenz](LICENSE)** lizenziert.

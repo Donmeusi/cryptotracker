@@ -14,6 +14,7 @@
 | [🔄 System-Updates & Branches](System-Updates-und-Branch-Wechsel.md) | Kanal-Wechsel (`main` / `beta`) und 1-Klick Updates direkt aus der App |
 | [🧮 Steuerlogik & § 23 EStG](Steuerberechnung-und-Haltefristen.md) | Funktionsweise von FIFO, LIFO & HIFO sowie Haltefristen (> 365 Tage steuerfrei) |
 | [🎛️ Module & Funktionen](Module-und-Funktionen.md) | Flexibles Ein- und Ausblenden von DeFi- und NFT-Bereichen |
+| [🛡️ Systemdokumentation & TOM](SYSTEMDOKUMENTATION_UND_TOM.md) | Technische Systemdokumentation & Technisch-Organisatorische Maßnahmen (Art. 32 DSGVO) |
 
 ---
 
