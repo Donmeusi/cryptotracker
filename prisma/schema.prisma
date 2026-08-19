@@ -105,13 +105,14 @@ enum AssetType {
 }
 
 model Holding {
-  id           String   @id @default(cuid())
+  id           String    @id @default(cuid())
   portfolioId  String
   assetId      String
   amount       Float
   avgBuyPrice  Float
-  currentPrice Float    @default(0)
-  updatedAt    DateTime @updatedAt
+  buyDate      DateTime?
+  currentPrice Float     @default(0)
+  updatedAt    DateTime  @updatedAt
 
   portfolio Portfolio @relation(fields: [portfolioId], references: [id], onDelete: Cascade)
   asset     Asset     @relation(fields: [assetId], references: [id])

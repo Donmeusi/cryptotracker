@@ -13,8 +13,9 @@ interface NewAsset {
   type: string;
   amount: string;
   avgBuyPrice: string;
+  buyDate: string;
 }
-const EMPTY: NewAsset = { symbol: "", name: "", type: "CRYPTO", amount: "", avgBuyPrice: "" };
+const EMPTY: NewAsset = { symbol: "", name: "", type: "CRYPTO", amount: "", avgBuyPrice: "", buyDate: new Date().toISOString().slice(0, 10) };
 
 export default function AssetsPage() {
   const [search, setSearch] = useState("");
@@ -58,10 +59,21 @@ export default function AssetsPage() {
     if (!form.amount || parseFloat(form.amount) <= 0) { setFormError("Bitte eine gültige Menge eingeben."); return; }
     if (!form.avgBuyPrice || parseFloat(form.avgBuyPrice) < 0) { setFormError("Bitte einen gültigen Kaufkurs eingeben."); return; }
     if (editSymbol) {
-      setHoldings((prev) => prev.map(h => h.symbol === editSymbol ? { ...h, amount: parseFloat(form.amount), avgBuyPrice: parseFloat(form.avgBuyPrice), symbol: form.symbol.toUpperCase() } : h));
+      setHoldings((prev) => prev.map(h => h.symbol === editSymbol ? {
+        ...h,
+        amount: parseFloat(form.amount),
+        avgBuyPrice: parseFloat(form.avgBuyPrice),
+        symbol: form.symbol.toUpperCase(),
+        buyDate: form.buyDate || new Date().toISOString().slice(0, 10),
+      } : h));
     } else {
       setHoldings((prev) => [
-        { symbol: form.symbol.toUpperCase(), amount: parseFloat(form.amount), avgBuyPrice: parseFloat(form.avgBuyPrice) },
+        {
+          symbol: form.symbol.toUpperCase(),
+          amount: parseFloat(form.amount),
+          avgBuyPrice: parseFloat(form.avgBuyPrice),
+          buyDate: form.buyDate || new Date().toISOString().slice(0, 10),
+        },
         ...prev,
       ]);
     }
@@ -69,13 +81,14 @@ export default function AssetsPage() {
     setTimeout(() => { setShowModal(false); setForm(EMPTY); setSaved(false); setFormError(""); setEditSymbol(null); }, 900);
   }
 
-  function handleEdit(item: { symbol: string; asset: { name: string }; amount: number; avgBuyPrice: number }) {
+  function handleEdit(item: { symbol: string; asset: { name: string }; amount: number; avgBuyPrice: number; buyDate?: string }) {
     setForm({
       symbol: item.symbol,
       name: item.asset.name || "",
       type: "CRYPTO",
       amount: item.amount.toString(),
-      avgBuyPrice: item.avgBuyPrice.toString()
+      avgBuyPrice: item.avgBuyPrice.toString(),
+      buyDate: item.buyDate || new Date().toISOString().slice(0, 10),
     });
     setEditSymbol(item.symbol);
     setShowModal(true);
@@ -138,7 +151,7 @@ export default function AssetsPage() {
         ) : (
           <div className="table-wrapper">
             <table className="table">
-              <thead><tr><th>#</th><th>Asset</th><th>Kurs</th><th>24h</th><th>Bestand</th><th>Ø Kaufkurs</th><th>Marktwert</th><th>G&V (€)</th><th>G&V (%)</th><th style={{ textAlign: "right" }}>Aktionen</th></tr></thead>
+              <thead><tr><th>#</th><th>Asset</th><th>Kurs</th><th>24h</th><th>Bestand</th><th>Kaufdatum</th><th>Ø Kaufkurs</th><th>Marktwert</th><th>G&V (€)</th><th>G&V (%)</th><th style={{ textAlign: "right" }}>Aktionen</th></tr></thead>
               <tbody>
                 {filtered.map((item, i) => (
                   <tr key={item.symbol}>
@@ -164,6 +177,9 @@ export default function AssetsPage() {
                       })()}
                     </td>
                     <td className="mono">{item.amount.toFixed(item.asset.price > 1000 ? 4 : 2)} {item.symbol}</td>
+                    <td className="mono" style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)" }}>
+                      {item.buyDate ? new Date(item.buyDate).toLocaleDateString("de-DE") : "—"}
+                    </td>
                     <td className="mono">{formatCurrency(item.avgBuyPrice, "EUR")}</td>
                     <td className="mono primary">{formatCurrency(item.marketValue, "EUR")}</td>
                     <td><span className={`mono ${item.pnl >= 0 ? "positive" : "negative"}`}>{item.pnl >= 0 ? "+" : ""}{formatCurrency(item.pnl, "EUR")}</span></td>
@@ -211,11 +227,17 @@ export default function AssetsPage() {
                   <input id="a-price" type="number" step="any" min="0" className="input mono" placeholder="z.B. 45000" value={form.avgBuyPrice} onChange={(e) => { setForm((p) => ({ ...p, avgBuyPrice: e.target.value })); setFormError(""); }} />
                 </div>
               </div>
-              <div className="input-group">
-                <label className="label" htmlFor="a-type">Asset-Typ</label>
-                <select id="a-type" className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
-                  {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
-                </select>
+              <div className="form-grid-2">
+                <div className="input-group">
+                  <label className="label" htmlFor="a-date">Kaufdatum *</label>
+                  <input id="a-date" type="date" className="input mono" value={form.buyDate} onChange={(e) => setForm((p) => ({ ...p, buyDate: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="a-type">Asset-Typ</label>
+                  <select id="a-type" className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
+                    {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
+                  </select>
+                </div>
               </div>
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setForm(EMPTY); setFormError(""); setEditSymbol(null); }}>Abbrechen</button>

@@ -100,12 +100,12 @@ export const MOCK_ASSETS = [
 
 // Mock-Portfolio-Holdings
 export const MOCK_HOLDINGS = [
-  { symbol: "BTC", amount: 0.5432, avgBuyPrice: 45000 },
-  { symbol: "ETH", amount: 4.21, avgBuyPrice: 2100 },
-  { symbol: "SOL", amount: 87.5, avgBuyPrice: 95 },
-  { symbol: "ADA", amount: 12500, avgBuyPrice: 0.45 },
-  { symbol: "LINK", amount: 350, avgBuyPrice: 8.5 },
-  { symbol: "UNI", amount: 220, avgBuyPrice: 6.1 },
+  { symbol: "BTC", amount: 0.5432, avgBuyPrice: 45000, buyDate: "2023-01-15" },
+  { symbol: "ETH", amount: 4.21, avgBuyPrice: 2100, buyDate: "2023-05-10" },
+  { symbol: "SOL", amount: 87.5, avgBuyPrice: 95, buyDate: "2023-11-20" },
+  { symbol: "ADA", amount: 12500, avgBuyPrice: 0.45, buyDate: "2024-02-01" },
+  { symbol: "LINK", amount: 350, avgBuyPrice: 8.5, buyDate: "2024-03-12" },
+  { symbol: "UNI", amount: 220, avgBuyPrice: 6.1, buyDate: "2024-04-05" },
 ];
 
 // Mock-Trades - Deterministische trades für präzise Steuertests
