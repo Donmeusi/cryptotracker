@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import {
   User, Shield, Database, Bell, Palette, ChevronRight,
   CheckCircle, Download, LayoutGrid, Layers, Image as ImageIcon,
+  CloudDownload, GitBranch,
 } from "lucide-react";
 import { downloadCSV, downloadJSON } from "@/lib/exportUtils";
 import { MOCK_HOLDINGS, MOCK_ASSETS, generateMockTrades, MOCK_DEFI_POSITIONS, MOCK_NFTS } from "@/lib/mock/data";
@@ -17,7 +18,7 @@ const WAEHRUNGEN = [
   { code: "JPY", name: "Japanischer Yen (¥)" },
 ];
 
-type Tab = "profil" | "sicherheit" | "erscheinungsbild" | "module" | "benachrichtigungen" | "datenbank";
+type Tab = "profil" | "sicherheit" | "erscheinungsbild" | "module" | "benachrichtigungen" | "datenbank" | "system";
 
 const NAV_ITEMS: { id: Tab; icon: React.ComponentType<{ size?: number }>; label: string }[] = [
   { id: "profil", icon: User, label: "Profil" },
@@ -26,6 +27,7 @@ const NAV_ITEMS: { id: Tab; icon: React.ComponentType<{ size?: number }>; label:
   { id: "module", icon: LayoutGrid, label: "Module & Funktionen" },
   { id: "benachrichtigungen", icon: Bell, label: "Benachrichtigungen" },
   { id: "datenbank", icon: Database, label: "Datenbank & Export" },
+  { id: "system", icon: CloudDownload, label: "System & Updates" },
 ];
 
 // ─── Theme definitions ────────────────────────────────────────────────────────
@@ -839,6 +841,251 @@ function OidcSettingsPanel() {
   );
 }
 
+function SystemUpdatePanel() {
+  const [repoUrl, setRepoUrl] = useState("https://github.com/Donmeusi/cryptotracker.git");
+  const [currentBranch, setCurrentBranch] = useState("main");
+  const [targetBranch, setTargetBranch] = useState("main");
+  const [localCommit, setLocalCommit] = useState("v0.3.0");
+  const [remoteCommit, setRemoteCommit] = useState("v0.3.0");
+  const [updatesAvailable, setUpdatesAvailable] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
+  const [logs, setLogs] = useState<string[]>([]);
+  const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+
+  const fetchVersionInfo = async () => {
+    setLoading(true);
+    try {
+      const res = await fetch("/api/system/update");
+      const data = await res.json();
+      if (!data.error) {
+        setCurrentBranch(data.currentBranch || "main");
+        setTargetBranch(data.currentBranch || "main");
+        setLocalCommit(data.localCommit || "v0.3.0");
+        setRemoteCommit(data.remoteCommit || "v0.3.0");
+        setRepoUrl(data.repoUrl || "https://github.com/Donmeusi/cryptotracker.git");
+        setUpdatesAvailable(Boolean(data.updatesAvailable));
+      }
+    } catch (e) {
+      console.error("Error fetching version info", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchVersionInfo();
+  }, []);
+
+  const handleSaveRepoUrl = () => {
+    setSaveStatus("saved");
+    setTimeout(() => setSaveStatus("idle"), 2500);
+  };
+
+  const handleDoUpdate = async () => {
+    if (!confirm(`Möchtest du das Update / den Kanal-Wechsel auf '${targetBranch}' jetzt wirklich durchführen?`)) {
+      return;
+    }
+    setUpdating(true);
+    setLogs(["Update wird initialisiert..."]);
+    try {
+      const res = await fetch("/api/system/update", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ targetBranch, repoUrl }),
+      });
+      const data = await res.json();
+      if (data.logs) {
+        setLogs(data.logs);
+      }
+      if (data.success) {
+        setCurrentBranch(data.currentBranch);
+        setLocalCommit(data.updatedCommit);
+        setUpdatesAvailable(false);
+      }
+    } catch (e: any) {
+      setLogs((prev) => [...prev, `Fehler beim Ausführen: ${e?.message || e}`]);
+    } finally {
+      setUpdating(false);
+    }
+  };
+
+  return (
+    <div>
+      <div style={{ marginBottom: "var(--space-6)" }}>
+        <h2 className="settings-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <GitBranch size={18} style={{ color: "#F1502F" }} /> Repository-Konfiguration
+        </h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-4)" }}>
+          Quell-URL für automatische System-Updates. Standard: <code className="code">https://github.com/Donmeusi/cryptotracker.git</code>
+        </p>
+
+        <div className="input-group">
+          <label className="label">Git Repository URL</label>
+          <input
+            type="text"
+            className="input"
+            value={repoUrl}
+            onChange={(e) => setRepoUrl(e.target.value)}
+            placeholder="https://github.com/Donmeusi/cryptotracker.git"
+          />
+        </div>
+
+        <div style={{ marginTop: "var(--space-3)", display: "flex", gap: "var(--space-3)", alignItems: "center" }}>
+          <button className="btn btn-secondary" onClick={handleSaveRepoUrl}>
+            URL speichern
+          </button>
+          <button
+            className="btn btn-ghost"
+            onClick={() => setRepoUrl("https://github.com/Donmeusi/cryptotracker.git")}
+          >
+            Standard wiederherstellen
+          </button>
+          {saveStatus === "saved" && (
+            <span className="save-feedback success">
+              <CheckCircle size={14} /> URL gespeichert
+            </span>
+          )}
+        </div>
+      </div>
+
+      <div className="divider" />
+
+      <div style={{ marginTop: "var(--space-4)" }}>
+        <h2 className="settings-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <CloudDownload size={18} style={{ color: "var(--green)" }} /> Versionsprüfung & Update-Kanal
+        </h2>
+
+        {/* Version info card */}
+        <div
+          style={{
+            background: "var(--bg-surface)",
+            borderRadius: "var(--radius-md)",
+            border: "1px solid var(--border)",
+            padding: "var(--space-4)",
+            marginBottom: "var(--space-4)",
+          }}
+        >
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "var(--space-4)" }}>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Installierte Version (Lokal):</span>
+              <div style={{ marginTop: 4 }}>
+                <code className="code" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                  {loading ? "Wird geladen..." : localCommit}
+                </code>
+              </div>
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Neueste Version (Remote):</span>
+              <div style={{ marginTop: 4 }}>
+                <code className="code" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                  {loading ? "Wird geladen..." : remoteCommit}
+                </code>
+              </div>
+            </div>
+            <div>
+              <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Aktueller Kanal:</span>
+              <div style={{ marginTop: 4 }}>
+                <span className={`badge ${currentBranch === "main" ? "badge-green" : "badge-orange"}`}>
+                  {currentBranch.toUpperCase()}
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Channel select */}
+        <div className="input-group" style={{ marginBottom: "var(--space-4)" }}>
+          <label className="label">Update-Kanal (Branch) wählen</label>
+          <select
+            className="input"
+            style={{ maxWidth: "320px" }}
+            value={targetBranch}
+            onChange={(e) => setTargetBranch(e.target.value)}
+          >
+            <option value="main">Stable (main)</option>
+            <option value="beta">Beta (beta)</option>
+          </select>
+          <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 6 }}>
+            Aktueller Kanal: <strong>{currentBranch}</strong>. Wenn du den Kanal wechselst, wird das System beim Update automatisch auf den gewählten Zweig umgestellt.
+          </p>
+        </div>
+
+        {/* Status indicator */}
+        {updatesAvailable ? (
+          <div
+            style={{
+              padding: "var(--space-3) var(--space-4)",
+              background: "rgba(34,197,94,0.1)",
+              border: "1px solid rgba(34,197,94,0.3)",
+              borderRadius: "var(--radius-md)",
+              color: "#22c55e",
+              fontSize: "var(--text-sm)",
+              marginBottom: "var(--space-4)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <CheckCircle size={16} /> Neues Update auf dem Kanal '{targetBranch}' verfügbar!
+          </div>
+        ) : (
+          <div
+            style={{
+              padding: "var(--space-3) var(--space-4)",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              color: "var(--text-secondary)",
+              fontSize: "var(--text-sm)",
+              marginBottom: "var(--space-4)",
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+            }}
+          >
+            <CheckCircle size={16} style={{ color: "var(--green)" }} />
+            Dein System ist auf dem neuesten Stand für den Kanal '{currentBranch}'.
+          </div>
+        )}
+
+        {/* Execute button */}
+        <button
+          className="btn btn-primary"
+          onClick={handleDoUpdate}
+          disabled={updating || loading}
+          style={{ gap: 8 }}
+        >
+          {updating ? "Update wird durchgeführt..." : "Update / Kanal-Wechsel durchführen"}
+        </button>
+
+        {/* Log box */}
+        {logs.length > 0 && (
+          <div
+            style={{
+              marginTop: "var(--space-4)",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              padding: "var(--space-3)",
+              fontFamily: "monospace",
+              fontSize: "12px",
+              color: "var(--text-secondary)",
+              maxHeight: "180px",
+              overflowY: "auto",
+            }}
+          >
+            <div style={{ fontWeight: 600, color: "var(--text-primary)", marginBottom: 4 }}>Execution Log:</div>
+            {logs.map((log, index) => (
+              <div key={index}>&gt; {log}</div>
+            ))}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function EinstellungenPage() {
   const { data: session } = useSession();
   const user = session?.user as { name?: string; email?: string; currency?: string } | undefined;
@@ -1123,6 +1370,13 @@ export default function EinstellungenPage() {
                   </button>
                 </div>
               </div>
+            </div>
+          )}
+
+          {/* System & Updates Panel */}
+          {activeTab === "system" && (
+            <div className="card settings-panel fade-in">
+              <SystemUpdatePanel />
             </div>
           )}
 
