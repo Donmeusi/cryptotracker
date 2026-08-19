@@ -13,8 +13,15 @@ export type DbConfig = {
 export function validateDbConfig(config: DbConfig): { valid: boolean; error?: string } {
   if (config.type === "sqlite") return { valid: true };
 
+  // Check if custom URL is provided and matches the target database scheme
   if (config.url && config.url.trim().length > 0) {
-    return { valid: true };
+    const trimmed = config.url.trim();
+    if (config.type === "postgresql" && (trimmed.startsWith("postgres://") || trimmed.startsWith("postgresql://"))) {
+      return { valid: true };
+    }
+    if (config.type === "mysql" && trimmed.startsWith("mysql://")) {
+      return { valid: true };
+    }
   }
 
   const host = config.host ? String(config.host).trim() : "";
@@ -45,7 +52,12 @@ export function loadDbConfig(): DbConfig {
 
       if (fs.existsSync(configFile)) {
         const data = fs.readFileSync(configFile, "utf-8");
-        return JSON.parse(data);
+        const parsed = JSON.parse(data);
+        // Ensure invalid sqlite URL isn't attached to postgresql/mysql
+        if (parsed.type !== "sqlite" && parsed.url && parsed.url.startsWith("file:")) {
+          parsed.url = "";
+        }
+        return parsed;
       }
     } catch (e) {
       console.error("Error loading db-config.json", e);
@@ -73,7 +85,14 @@ export function saveDbConfig(config: DbConfig): void {
     if (!fs.existsSync(dir)) {
       fs.mkdirSync(dir, { recursive: true });
     }
-    fs.writeFileSync(configFile, JSON.stringify(config, null, 2), "utf-8");
+
+    // Clean up url if switching away from sqlite
+    const cleanConfig = { ...config };
+    if (cleanConfig.type !== "sqlite" && cleanConfig.url && cleanConfig.url.startsWith("file:")) {
+      cleanConfig.url = "";
+    }
+
+    fs.writeFileSync(configFile, JSON.stringify(cleanConfig, null, 2), "utf-8");
   }
 }
 
@@ -81,7 +100,16 @@ export function getActiveDbUrl(config?: DbConfig): string {
   const conf = config || loadDbConfig();
 
   if (conf.url && conf.url.trim().length > 0) {
-    return conf.url.trim();
+    const trimmed = conf.url.trim();
+    if (conf.type === "sqlite" && (trimmed.startsWith("file:") || trimmed.startsWith("sqlite:"))) {
+      return trimmed;
+    }
+    if (conf.type === "postgresql" && (trimmed.startsWith("postgres://") || trimmed.startsWith("postgresql://"))) {
+      return trimmed;
+    }
+    if (conf.type === "mysql" && trimmed.startsWith("mysql://")) {
+      return trimmed;
+    }
   }
 
   if (conf.type === "postgresql") {
@@ -90,6 +118,7 @@ export function getActiveDbUrl(config?: DbConfig): string {
     const dbName = conf.database?.trim() || "";
     const user = conf.username?.trim() || "";
     const pass = conf.password || "";
+    if (!host || !dbName || !user) return "";
     return `postgresql://${user}:${encodeURIComponent(pass)}@${host}:${port}/${dbName}?schema=public`;
   }
 
@@ -99,6 +128,7 @@ export function getActiveDbUrl(config?: DbConfig): string {
     const dbName = conf.database?.trim() || "";
     const user = conf.username?.trim() || "";
     const pass = conf.password || "";
+    if (!host || !dbName || !user) return "";
     return `mysql://${user}:${encodeURIComponent(pass)}@${host}:${port}/${dbName}`;
   }
 

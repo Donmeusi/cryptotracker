@@ -1221,6 +1221,7 @@ function DbConfigPanel() {
             setForm({
               ...form,
               type: newType,
+              url: newType === "sqlite" ? "file:./cryptotracker.db" : "",
               port: newType === "postgresql" ? 5432 : newType === "mysql" ? 3306 : "",
             });
           }}

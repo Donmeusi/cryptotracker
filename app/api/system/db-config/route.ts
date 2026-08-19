@@ -32,9 +32,10 @@ function testTcpPort(host: string, port: number): Promise<boolean> {
 export async function GET() {
   try {
     const config = loadDbConfig();
+    const cleanUrl = (config.type !== "sqlite" && config.url?.startsWith("file:")) ? "" : config.url || "";
     return NextResponse.json({
       type: config.type || "sqlite",
-      url: config.url || "",
+      url: cleanUrl,
       host: config.host || "",
       port: config.port || (config.type === "postgresql" ? 5432 : config.type === "mysql" ? 3306 : undefined),
       database: config.database || "",
@@ -54,12 +55,17 @@ export async function POST(req: Request) {
     const action = body.action || "test";
     const submittedConfig: DbConfig = body.config || { type: "sqlite" };
 
+    // Clean URL if type isn't sqlite and URL points to file:
+    if (submittedConfig.type !== "sqlite" && submittedConfig.url?.startsWith("file:")) {
+      submittedConfig.url = "";
+    }
+
     // Strict input validation
     const validation = validateDbConfig(submittedConfig);
     if (!validation.valid) {
       return NextResponse.json({
         success: false,
-        error: validation.error || "Bitte fülle alle erforderlichen Felder aus (Host, Datenbankname, Benutzername).",
+        error: validation.error || "Bitte fülle Host, Datenbankname und Benutzername aus.",
       }, { status: 400 });
     }
 
@@ -71,15 +77,30 @@ export async function POST(req: Request) {
 
     const connectionUrl = getActiveDbUrl(submittedConfig);
 
+    if (!connectionUrl && submittedConfig.type !== "sqlite") {
+      return NextResponse.json({
+        success: false,
+        error: "Ungültige Verbindungsdaten. Bitte fülle Host, Datenbankname und Benutzername aus.",
+      }, { status: 400 });
+    }
+
     if (action === "test") {
       if (submittedConfig.type !== "sqlite" && !submittedConfig.url) {
         const host = (submittedConfig.host || "").trim();
         const port = Number(submittedConfig.port) || (submittedConfig.type === "postgresql" ? 5432 : 3306);
+        
+        if (!host) {
+          return NextResponse.json({
+            success: false,
+            error: "Host / Server-IP ist erforderlich.",
+          }, { status: 400 });
+        }
+
         const reachable = await testTcpPort(host, port);
         if (!reachable) {
           return NextResponse.json({
             success: false,
-            error: `Der Datenbank-Server '${host || "Unbekannt"}:${port}' konnte nicht erreicht werden. Ist der Server online und der Port freigegeben?`,
+            error: `Der Datenbank-Server '${host}:${port}' konnte nicht erreicht werden. Ist der Server online und der Port freigegeben?`,
           }, { status: 400 });
         }
       }
