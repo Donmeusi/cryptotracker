@@ -4,11 +4,31 @@ export type DbConfig = {
   type: DbProvider;
   url?: string;
   host?: string;
-  port?: number;
+  port?: number | string;
   database?: string;
   username?: string;
   password?: string;
 };
+
+export function validateDbConfig(config: DbConfig): { valid: boolean; error?: string } {
+  if (config.type === "sqlite") return { valid: true };
+
+  if (config.url && config.url.trim().length > 0) {
+    return { valid: true };
+  }
+
+  if (!config.host || config.host.trim().length === 0) {
+    return { valid: false, error: "Host / Server-IP darf nicht leer sein." };
+  }
+  if (!config.database || config.database.trim().length === 0) {
+    return { valid: false, error: "Datenbankname darf nicht leer sein." };
+  }
+  if (!config.username || config.username.trim().length === 0) {
+    return { valid: false, error: "Benutzername darf nicht leer sein." };
+  }
+
+  return { valid: true };
+}
 
 // Edge-safe helper to read configuration in Node.js runtime
 export function loadDbConfig(): DbConfig {
@@ -61,19 +81,19 @@ export function getActiveDbUrl(config?: DbConfig): string {
   }
 
   if (conf.type === "postgresql") {
-    const host = conf.host || "localhost";
+    const host = conf.host?.trim() || "";
     const port = conf.port || 5432;
-    const dbName = conf.database || "cryptotracker";
-    const user = conf.username || "postgres";
+    const dbName = conf.database?.trim() || "";
+    const user = conf.username?.trim() || "";
     const pass = conf.password || "";
     return `postgresql://${user}:${encodeURIComponent(pass)}@${host}:${port}/${dbName}?schema=public`;
   }
 
   if (conf.type === "mysql") {
-    const host = conf.host || "localhost";
+    const host = conf.host?.trim() || "";
     const port = conf.port || 3306;
-    const dbName = conf.database || "cryptotracker";
-    const user = conf.username || "root";
+    const dbName = conf.database?.trim() || "";
+    const user = conf.username?.trim() || "";
     const pass = conf.password || "";
     return `mysql://${user}:${encodeURIComponent(pass)}@${host}:${port}/${dbName}`;
   }
