@@ -9,6 +9,10 @@ const execAsync = promisify(exec);
 
 function testTcpPort(host: string, port: number): Promise<boolean> {
   return new Promise((resolve) => {
+    if (!host || host.trim().length === 0) {
+      resolve(false);
+      return;
+    }
     const socket = new net.Socket();
     socket.setTimeout(3000);
     socket.on("connect", () => {
@@ -20,7 +24,7 @@ function testTcpPort(host: string, port: number): Promise<boolean> {
       socket.destroy();
       resolve(false);
     });
-    socket.connect(port, host);
+    socket.connect(port, host.trim());
   });
 }
 
@@ -50,12 +54,12 @@ export async function POST(req: Request) {
     const action = body.action || "test";
     const submittedConfig: DbConfig = body.config || { type: "sqlite" };
 
-    // Validate inputs
+    // Strict input validation
     const validation = validateDbConfig(submittedConfig);
     if (!validation.valid) {
       return NextResponse.json({
         success: false,
-        error: validation.error || "Fehlende Pflichtfelder.",
+        error: validation.error || "Bitte fülle alle erforderlichen Felder aus (Host, Datenbankname, Benutzername).",
       }, { status: 400 });
     }
 
@@ -69,13 +73,13 @@ export async function POST(req: Request) {
 
     if (action === "test") {
       if (submittedConfig.type !== "sqlite" && !submittedConfig.url) {
-        const host = submittedConfig.host || "localhost";
+        const host = (submittedConfig.host || "").trim();
         const port = Number(submittedConfig.port) || (submittedConfig.type === "postgresql" ? 5432 : 3306);
         const reachable = await testTcpPort(host, port);
         if (!reachable) {
           return NextResponse.json({
             success: false,
-            error: `Der Datenbank-Server '${host}:${port}' konnte nicht erreicht werden. Ist der Server online und der Port freigegeben?`,
+            error: `Der Datenbank-Server '${host || "Unbekannt"}:${port}' konnte nicht erreicht werden. Ist der Server online und der Port freigegeben?`,
           }, { status: 400 });
         }
       }

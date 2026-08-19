@@ -17,13 +17,17 @@ export function validateDbConfig(config: DbConfig): { valid: boolean; error?: st
     return { valid: true };
   }
 
-  if (!config.host || config.host.trim().length === 0) {
+  const host = config.host ? String(config.host).trim() : "";
+  const database = config.database ? String(config.database).trim() : "";
+  const username = config.username ? String(config.username).trim() : "";
+
+  if (!host) {
     return { valid: false, error: "Host / Server-IP darf nicht leer sein." };
   }
-  if (!config.database || config.database.trim().length === 0) {
+  if (!database) {
     return { valid: false, error: "Datenbankname darf nicht leer sein." };
   }
-  if (!config.username || config.username.trim().length === 0) {
+  if (!username) {
     return { valid: false, error: "Benutzername darf nicht leer sein." };
   }
 

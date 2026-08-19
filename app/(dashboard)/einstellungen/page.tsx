@@ -1136,6 +1136,20 @@ function DbConfigPanel() {
   }, []);
 
   const handleTestConnection = async () => {
+    if (form.type !== "sqlite") {
+      const host = (form.host || "").trim();
+      const database = (form.database || "").trim();
+      const username = (form.username || "").trim();
+      const url = (form.url || "").trim();
+
+      if (!url && (!host || !database || !username)) {
+        setTestResult({
+          success: false,
+          error: "Bitte fülle Host, Datenbankname und Benutzername aus.",
+        });
+        return;
+      }
+    }
     setTesting(true);
     setTestResult(null);
     try {
@@ -1148,7 +1162,7 @@ function DbConfigPanel() {
       if (data.success) {
         setTestResult({ success: true, message: data.message });
       } else {
-        setTestResult({ success: false, error: data.error });
+        setTestResult({ success: false, error: data.error || "Verbindungstest fehlgeschlagen." });
       }
     } catch (e: any) {
       setTestResult({ success: false, error: e?.message || "Netzwerkfehler beim Verbindungstest" });

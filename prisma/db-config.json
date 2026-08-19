@@ -1,0 +1,10 @@
+{
+  "type": "sqlite",
+  "url": "file:./cryptotracker.db",
+  "host": "",
+  "port": "",
+  "database": "",
+  "username": "",
+  "password": "",
+  "hasPassword": false
+}
