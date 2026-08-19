@@ -26,8 +26,8 @@ const FILTER_MAP: Record<string, string[]> = {
   "Alle": [],
   "Kauf": ["BUY"],
   "Verkauf": ["SELL"],
-  "Transfer": ["TRANSFER_IN", "TRANSFER_OUT"],
   "Staking": ["STAKING_REWARD", "AIRDROP"],
+  "Transfer": ["TRANSFER_IN", "TRANSFER_OUT"],
 };
 
 type Trade = ReturnType<typeof generateMockTrades>[number];
@@ -112,6 +112,60 @@ export default function TradesPage() {
         </div>
       </div>
 
+      {/* Untermenü / Kategorien-Navigation */}
+      <div
+        className="sub-menu-bar"
+        style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          marginBottom: "var(--space-5)",
+          background: "var(--bg-surface)",
+          padding: "var(--space-2) var(--space-3)",
+          borderRadius: "var(--radius-lg)",
+          border: "1px solid var(--border)",
+        }}
+      >
+        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+          {Object.keys(FILTER_MAP).map((f) => {
+            const isActive = activeFilter === f;
+            return (
+              <button
+                key={f}
+                className={`nav-tab-btn ${isActive ? "active" : ""}`}
+                onClick={() => setActiveFilter(f)}
+                style={{
+                  padding: "var(--space-2) var(--space-4)",
+                  borderRadius: "var(--radius-md)",
+                  fontSize: "var(--text-sm)",
+                  fontWeight: isActive ? 600 : 500,
+                  color: isActive ? "var(--green)" : "var(--text-secondary)",
+                  background: isActive ? "var(--green-dim)" : "transparent",
+                  border: isActive ? "1px solid rgba(34, 197, 94, 0.3)" : "1px solid transparent",
+                  cursor: "pointer",
+                  transition: "all var(--transition-fast)",
+                }}
+              >
+                {f}
+              </button>
+            );
+          })}
+        </div>
+        <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center" }}>
+          <select
+            className="input"
+            style={{ width: "auto", fontSize: "var(--text-sm)", padding: "6px 12px" }}
+            value={exchangeFilter}
+            onChange={(e) => setExchangeFilter(e.target.value)}
+          >
+            <option>Alle Börsen</option>
+            <option>Binance</option>
+            <option>Kraken</option>
+            <option>Coinbase</option>
+          </select>
+        </div>
+      </div>
+
       {/* Stats-Zeile */}
       <div className="grid-3" style={{ marginBottom: "var(--space-5)" }}>
         <div className="stat-card">
@@ -131,34 +185,6 @@ export default function TradesPage() {
           <div className="stat-value mono" style={{ fontSize: "var(--text-2xl)" }}>
             {formatCurrency(total, "EUR", true)}
           </div>
-        </div>
-      </div>
-
-      {/* Filter-Leiste */}
-      <div className="filter-bar">
-        <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
-          {Object.keys(FILTER_MAP).map((f) => (
-            <button
-              key={f}
-              className={`filter-btn ${activeFilter === f ? "active" : ""}`}
-              onClick={() => setActiveFilter(f)}
-            >
-              {f}
-            </button>
-          ))}
-        </div>
-        <div style={{ display: "flex", gap: "var(--space-3)", alignItems: "center" }}>
-          <select
-            className="input"
-            style={{ width: "auto", fontSize: "var(--text-sm)" }}
-            value={exchangeFilter}
-            onChange={(e) => setExchangeFilter(e.target.value)}
-          >
-            <option>Alle Börsen</option>
-            <option>Binance</option>
-            <option>Kraken</option>
-            <option>Coinbase</option>
-          </select>
         </div>
       </div>
 
