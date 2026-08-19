@@ -4,6 +4,11 @@ import { promisify } from "util";
 
 const execAsync = promisify(exec);
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 // GET /api/system/update
 export async function GET() {
   try {
@@ -53,9 +58,9 @@ export async function GET() {
       remoteUrl,
       updatesAvailable,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("System update GET error:", error);
-    return NextResponse.json({ error: error?.message || "Failed to check version" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) || "Failed to check version" }, { status: 500 });
   }
 }
 
@@ -77,8 +82,8 @@ export async function POST(req: Request) {
         try {
           await execAsync(`git remote add origin ${repoUrl}`, { cwd });
           logs.push(`Remote origin hinzugefügt: ${repoUrl}`);
-        } catch (err: any) {
-          logs.push(`Remote-URL Hinweis: ${err?.message}`);
+        } catch (err: unknown) {
+          logs.push(`Remote-URL Hinweis: ${getErrorMessage(err)}`);
         }
       }
     }
@@ -88,8 +93,8 @@ export async function POST(req: Request) {
       const { stdout } = await execAsync("git fetch origin", { cwd });
       logs.push("Git fetch origin erfolgreich ausgeführt.");
       if (stdout.trim()) logs.push(stdout.trim());
-    } catch (e: any) {
-      logs.push(`Git fetch Warnung: ${e?.message || e}`);
+    } catch (e: unknown) {
+      logs.push(`Git fetch Warnung: ${getErrorMessage(e)}`);
     }
 
     // 3. Git Checkout target branch
@@ -98,13 +103,13 @@ export async function POST(req: Request) {
       logs.push(`Erfolgreich auf Branch '${targetBranch}' gewechselt.`);
       if (stdout.trim()) logs.push(stdout.trim());
       if (stderr.trim()) logs.push(stderr.trim());
-    } catch (e: any) {
+    } catch (e: unknown) {
       // If branch doesn't exist locally, track remote
       try {
         await execAsync(`git checkout -b ${targetBranch} origin/${targetBranch}`, { cwd });
         logs.push(`Branch '${targetBranch}' neu von origin/${targetBranch} ausgecheckt.`);
-      } catch (err: any) {
-        logs.push(`Checkout Fehler: ${err?.message || err}`);
+      } catch (err: unknown) {
+        logs.push(`Checkout Fehler: ${getErrorMessage(err)}`);
       }
     }
 
@@ -113,8 +118,8 @@ export async function POST(req: Request) {
       const { stdout } = await execAsync(`git pull origin ${targetBranch}`, { cwd });
       logs.push(`Git pull origin ${targetBranch} erfolgreich.`);
       if (stdout.trim()) logs.push(stdout.trim());
-    } catch (e: any) {
-      logs.push(`Git pull Hinweis: ${e?.message || e}`);
+    } catch (e: unknown) {
+      logs.push(`Git pull Hinweis: ${getErrorMessage(e)}`);
     }
 
     // 5. Database Push & Prisma Generate
@@ -124,15 +129,16 @@ export async function POST(req: Request) {
       try {
         await execAsync("npx prisma generate", { cwd });
         logs.push("Prisma Client neu generiert.");
-      } catch (genErr: any) {
-        if (genErr?.message?.includes("EPERM") || genErr?.message?.includes("query_engine")) {
+      } catch (genErr: unknown) {
+        const msg = getErrorMessage(genErr);
+        if (msg.includes("EPERM") || msg.includes("query_engine")) {
           logs.push("Prisma Client: DLL während des App-Laufs gesperrt (wird beim nächsten App-Neustart neu kompiliert).");
         } else {
-          logs.push(`Prisma Generator Hinweis: ${genErr?.message || genErr}`);
+          logs.push(`Prisma Generator Hinweis: ${msg}`);
         }
       }
-    } catch (e: any) {
-      logs.push(`Prisma Sync Hinweis: ${e?.message || e}`);
+    } catch (e: unknown) {
+      logs.push(`Prisma Sync Hinweis: ${getErrorMessage(e)}`);
     }
 
     // 6. Get updated commit info
@@ -148,8 +154,8 @@ export async function POST(req: Request) {
       updatedCommit,
       logs,
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("System update POST error:", error);
-    return NextResponse.json({ error: error?.message || "Update execution failed" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) || "Update execution failed" }, { status: 500 });
   }
 }

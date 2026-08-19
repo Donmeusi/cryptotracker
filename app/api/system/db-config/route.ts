@@ -28,6 +28,11 @@ function testTcpPort(host: string, port: number): Promise<boolean> {
   });
 }
 
+function getErrorMessage(err: unknown): string {
+  if (err instanceof Error) return err.message;
+  return String(err);
+}
+
 // GET /api/system/db-config
 export async function GET() {
   try {
@@ -42,9 +47,9 @@ export async function GET() {
       username: config.username || "",
       hasPassword: Boolean(config.password && config.password.length > 0),
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("GET db-config error:", error);
-    return NextResponse.json({ error: error?.message || "Failed to load DB config" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) || "Failed to load DB config" }, { status: 500 });
   }
 }
 
@@ -114,11 +119,11 @@ export async function POST(req: Request) {
           success: true,
           message: `Verbindung zur ${submittedConfig.type.toUpperCase()}-Datenbank erfolgreich hergestellt!`,
         });
-      } catch (testError: any) {
+      } catch (testError: unknown) {
         await testClient.$disconnect().catch(() => {});
         return NextResponse.json({
           success: false,
-          error: `Authentifizierungs- oder Datenbankfehler: ${testError?.message || "Zugriff verweigert."}`,
+          error: `Authentifizierungs- oder Datenbankfehler: ${getErrorMessage(testError) || "Zugriff verweigert."}`,
         }, { status: 400 });
       }
     }
@@ -134,8 +139,8 @@ export async function POST(req: Request) {
         const env = { ...process.env, DATABASE_URL: connectionUrl };
         await execAsync("npx prisma db push --skip-generate", { cwd, env });
         logs.push("Datenbank-Schema auf der Ziel-Datenbank synchronisiert.");
-      } catch (syncErr: any) {
-        logs.push(`Schema-Sync Hinweis: ${syncErr?.message || syncErr}`);
+      } catch (syncErr: unknown) {
+        logs.push(`Schema-Sync Hinweis: ${getErrorMessage(syncErr)}`);
       }
 
       return NextResponse.json({
@@ -146,8 +151,8 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ error: "Invalid action" }, { status: 400 });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("POST db-config error:", error);
-    return NextResponse.json({ error: error?.message || "Operation failed" }, { status: 500 });
+    return NextResponse.json({ error: getErrorMessage(error) || "Operation failed" }, { status: 500 });
   }
 }

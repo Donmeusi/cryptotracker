@@ -31,7 +31,7 @@ export async function GET() {
       hasSecret: Boolean(config.clientSecret || process.env.OIDC_CLIENT_SECRET),
       clientName: config.clientName || envClientName,
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to fetch OIDC config:", error);
     return NextResponse.json({ error: "Failed to fetch OIDC config" }, { status: 500 });
   }
@@ -43,7 +43,13 @@ export async function PUT(req: Request) {
     const body = await req.json();
     const { enabled, issuer, clientId, clientSecret, clientName } = body;
 
-    const dataToUpdate: any = {
+    const dataToUpdate: {
+      enabled: boolean;
+      issuer: string | null;
+      clientId: string | null;
+      clientName: string;
+      clientSecret?: string;
+    } = {
       enabled: Boolean(enabled),
       issuer: issuer ? String(issuer).trim() : null,
       clientId: clientId ? String(clientId).trim() : null,
@@ -73,7 +79,7 @@ export async function PUT(req: Request) {
         hasSecret: Boolean(updated.clientSecret),
       },
     });
-  } catch (error) {
+  } catch (error: unknown) {
     console.error("Failed to save OIDC config:", error);
     return NextResponse.json({ error: "Failed to save OIDC config" }, { status: 500 });
   }
