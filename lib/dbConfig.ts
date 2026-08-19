@@ -1,6 +1,3 @@
-import fs from "fs";
-import path from "path";
-
 export type DbProvider = "sqlite" | "postgresql" | "mysql";
 
 export type DbConfig = {
@@ -13,16 +10,22 @@ export type DbConfig = {
   password?: string;
 };
 
-const CONFIG_FILE = path.join(process.cwd(), "prisma", "db-config.json");
-
+// Edge-safe helper to read configuration in Node.js runtime
 export function loadDbConfig(): DbConfig {
-  try {
-    if (fs.existsSync(CONFIG_FILE)) {
-      const data = fs.readFileSync(CONFIG_FILE, "utf-8");
-      return JSON.parse(data);
+  if (typeof window === "undefined" && process.env.NEXT_RUNTIME !== "edge") {
+    try {
+      // Dynamic require ensures Next.js Edge runtime bundler doesn't pull in Node.js 'fs' / 'path'
+      const fs = require("fs");
+      const path = require("path");
+      const configFile = path.join(process.cwd(), "prisma", "db-config.json");
+
+      if (fs.existsSync(configFile)) {
+        const data = fs.readFileSync(configFile, "utf-8");
+        return JSON.parse(data);
+      }
+    } catch (e) {
+      console.error("Error loading db-config.json", e);
     }
-  } catch (e) {
-    console.error("Error loading db-config.json", e);
   }
 
   // Fallback to env or local SQLite
@@ -37,11 +40,17 @@ export function loadDbConfig(): DbConfig {
 }
 
 export function saveDbConfig(config: DbConfig): void {
-  const dir = path.dirname(CONFIG_FILE);
-  if (!fs.existsSync(dir)) {
-    fs.mkdirSync(dir, { recursive: true });
+  if (typeof window === "undefined" && process.env.NEXT_RUNTIME !== "edge") {
+    const fs = require("fs");
+    const path = require("path");
+    const configFile = path.join(process.cwd(), "prisma", "db-config.json");
+    const dir = path.dirname(configFile);
+
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+    fs.writeFileSync(configFile, JSON.stringify(config, null, 2), "utf-8");
   }
-  fs.writeFileSync(CONFIG_FILE, JSON.stringify(config, null, 2), "utf-8");
 }
 
 export function getActiveDbUrl(config?: DbConfig): string {
@@ -69,5 +78,5 @@ export function getActiveDbUrl(config?: DbConfig): string {
     return `mysql://${user}:${encodeURIComponent(pass)}@${host}:${port}/${dbName}`;
   }
 
-  return "file:./cryptotracker.db";
+  return process.env.DATABASE_URL || "file:./cryptotracker.db";
 }
