@@ -120,8 +120,17 @@ export async function POST(req: Request) {
     // 5. Database Push & Prisma Generate
     try {
       await execAsync("npx prisma db push --skip-generate", { cwd });
-      await execAsync("npx prisma generate", { cwd });
-      logs.push("Datenbank-Schema & Prisma Client synchronisiert.");
+      logs.push("Datenbank-Schema erfolgreich synchronisiert.");
+      try {
+        await execAsync("npx prisma generate", { cwd });
+        logs.push("Prisma Client neu generiert.");
+      } catch (genErr: any) {
+        if (genErr?.message?.includes("EPERM") || genErr?.message?.includes("query_engine")) {
+          logs.push("Prisma Client: DLL während des App-Laufs gesperrt (wird beim nächsten App-Neustart neu kompiliert).");
+        } else {
+          logs.push(`Prisma Generator Hinweis: ${genErr?.message || genErr}`);
+        }
+      }
     } catch (e: any) {
       logs.push(`Prisma Sync Hinweis: ${e?.message || e}`);
     }
