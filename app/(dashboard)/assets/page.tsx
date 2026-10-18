@@ -79,7 +79,7 @@ export default function AssetsPage() {
 
   function handleBatchImportPdf(importedTrades: ParsedTrade[]) {
     setHoldings((prev) => {
-      let updated = [...prev];
+      const updated = [...prev];
       for (const t of importedTrades) {
         const sym = (t.asset || "BTC").toUpperCase();
         const amount = Number(t.amount) || 0;

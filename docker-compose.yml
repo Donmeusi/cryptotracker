@@ -1,19 +1,23 @@
 services:
   cryptotracker:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: cryptotracker_app
+    build: .
+    container_name: cryptotracker
     restart: unless-stopped
     ports:
       - "3000:3000"
     environment:
-      - NODE_ENV=production
-      - NEXTAUTH_URL=http://localhost:3000
-      - NEXTAUTH_SECRET=super-secret-crypto-tracker-key-2026
-      - DATABASE_URL=file:./prisma/cryptotracker.db
+      NODE_ENV: production
+      # Oeffentliche URL: fuer LAN die Host-IP, hinter einem Proxy die Domain.
+      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      # Pflicht. Kein Standardwert im Repo - sonst signiert jeder Container
+      # mit demselben Schluessel.
+      AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET muss in .env gesetzt sein}
+      NEXTAUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET muss in .env gesetzt sein}
+      AUTH_TRUST_HOST: "true"
+      DATABASE_URL: file:/data/cryptotracker.db
     volumes:
-      - cryptotracker_data:/app/prisma
+      - cryptotracker_data:/data
 
 volumes:
   cryptotracker_data:

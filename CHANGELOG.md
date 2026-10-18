@@ -4,6 +4,23 @@ Alle wichtigen Änderungen am Projekt **CryptoTracker** werden in dieser Datei d
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased] - 2026-10-18
+
+### Behoben (Fixed)
+- **Dockerfile war nicht baubar:** `apk add --no-exe` ist keine gültige Option (jetzt `--no-cache`), das vom Runner kopierte `public/` fehlte, und `npm ci` scheiterte am Peer-Konflikt zwischen `next-auth@5.0.0-beta` (`nodemailer ^7`) und `nodemailer@8` (jetzt `--legacy-peer-deps`).
+- **Next-Build scheiterte an ESLint:** `lib/dbConfig.ts` lädt `fs`/`path` absichtlich per `require`; die vier Stellen sind jetzt begründet freigestellt, statt das Linting global abzuschalten.
+- **Frische Datenbank hatte keine Tabellen:** Das Image enthält jetzt die Prisma-CLI und führt beim Start `prisma db push` aus.
+- **SQLite-Pfad aus der Umgebung wurde ignoriert:** `loadDbConfig()` fiel für `file:`-URLs immer auf `file:./cryptotracker.db` zurück. Im Container lag die Datenbank damit außerhalb des Volumes.
+- **Kein fest eingebautes Auth-Secret mehr:** `docker-compose.yml` verlangt `${AUTH_SECRET}` aus `.env`, statt mit einem Repo-weiten Schlüssel zu signieren. Die Datenbank liegt im Volume `/data`.
+
+### Entfernt (Removed)
+- Build-Artefakte aus dem Repo: `tsconfig.tsbuildinfo`, `prisma/db-config.json` und zwei `__pycache__`-Dateien. Alle drei sind jetzt gitignored; `db-config.json` enthält Laufzeit-Zugangsdaten.
+- Totes Script `db:seed` (verwies auf ein nicht vorhandenes `prisma/seed.ts`) und die nur dafür genutzte `tsx`-Abhängigkeit.
+
+### Dokumentation
+- README: Projektstatus ergänzt. Die Portfolio-Seiten und der Wallet-Scan sind ausdrücklich als Demo gekennzeichnet; das Prisma-Schema ist angelegt, die CRUD-Anbindung fehlt.
+- `.env.example` ergänzt.
+
 ## [v0.3.0] - 2026-08-19
 
 ### ✨ Hinzugefügt (Added)

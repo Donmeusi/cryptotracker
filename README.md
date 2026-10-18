@@ -4,6 +4,14 @@
 
 Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wallets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM, NextAuth.js v5 und Recharts — mit einem hochwertigen Dark/Light-Mode-UI, Docker-Unterstützung und Live-Preisen.
 
+> **Projektstatus (Oktober 2026): UI-Prototyp mit funktionierender Anmeldung.**
+> Authentifizierung, OIDC, PDF-Import, Live-Preise, Benachrichtigungen und die
+> Steuerberechnung laufen. Die Portfolio-Seiten (Dashboard, Assets, DeFi, NFTs,
+> Trades, Börsen) zeigen jedoch **Demodaten aus `lib/mock/data.ts`** und schreiben
+> nicht in die Datenbank. Das Prisma-Schema ist vollständig angelegt, die
+> CRUD-Anbindung fehlt noch. Eine frische Installation zeigt deshalb
+> Beispielvermögen statt eines leeren Depots. Der Wallet-Scan ist simuliert.
+
 ---
 
 ## ✨ Features
@@ -12,19 +20,19 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
 |---------|---------|
 | 📊 **Dashboard** | Aggregiertes Gesamtvermögen, Live-Auto-Sync (15s), Echtzeit-Preise mit Flash-Animationen |
 | 🎨 **Asset-Verteilung** | Donut-Chart mit Krypto-Branding (BTC, ETH, SOL, ADA), Donut-Center Badge & Proportionalbalken |
-| 🔗 **On-Chain Wallet Scanner** | Automatischer Balance-Scan für Ethereum (`0x...`), Bitcoin (`bc1...`), Solana & Polygon Adressen |
+| 🔗 **On-Chain Wallet Scanner** | **Simuliert:** prüft das Adressformat und liefert Zufallsbestände, fragt keine Chain-API ab |
 | 📄 **PDF Trade-Import** | Parser zur automatischen Extraktion von Kauf/Verkauf-Transaktionen aus PDF-Kontoauszügen |
 | 📱 **Mobile Responsiv** | Vollständige Responsivität (keine horizontale Laufleiste) mit mobilem Side-Drawer Navigation |
 | 🐳 **Docker Ready** | Optimiertes Multi-Stage Dockerfile (`output: "standalone"`) & Docker Compose Setup |
-| 💼 **Assets Tracker** | CRUD für alle Krypto-Positionen, Live-Preise, PnL pro Asset |
-| 🖼️ **NFT Manager** | Manuelle NFT-Erfassung mit Floor-Preis und Collection-Tracking |
-| 📈 **Trade-Historie** | Vollständige Transaktionsübersicht mit Filter, PDF-Import, Edit & Delete |
+| 💼 **Assets Tracker** | Ansicht mit Demodaten; Bearbeitungen bleiben nur im Browser (CRUD nicht persistiert) |
+| 🖼️ **NFT Manager** | Ansicht mit Demodaten |
+| 📈 **Trade-Historie** | Ansicht mit Demodaten; der PDF-Import liefert echte Transaktionen |
 | 🔑 **OIDC / SSO Integration** | Universal OpenID Connect Support (Pocket-ID, Keycloak, Authentik, Authelia, Zitadel) mit UI-basierter Verwaltung |
 | 🗄️ **Externe Datenbank (UI)** | PostgreSQL, MySQL / MariaDB & SQLite direkt über die Benutzeroberfläche verbinden mit Verbindungstest & Schema-Sync |
-| 🔄 **System & Updates** | Branch-Wechsel zwischen `main` (Stable) & `beta` (Beta), Versionsprüfung & 1-Klick Update aus der UI |
-| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Hover-Erklärungs-Tooltips, Haltedauer (> 365 Tage steuerfrei), PDF + CSV Export |
+| 🔄 **System & Updates** | Branch-Wechsel und 1-Klick-Update aus der UI; funktioniert nur in einer Installation mit git/npm, **nicht im Container** |
+| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Hover-Erklärungs-Tooltips, Haltedauer (> 365 Tage steuerfrei), PDF + CSV Export — rechnet derzeit auf Demodaten |
 | 🎛️ **Modul-Steuerung** | Flexibles Ein- & Ausblenden von Bereichen (DeFi, NFTs) in der Seitenleiste über Einstellungen |
-| 🏛️ **Börsen-Anbindung** | API-Key Verwaltung für Binance, Kraken, Coinbase, OKX, Bybit |
+| 🏛️ **Börsen-Anbindung** | API-Key-Eingabe im Demo-Modus; Schlüssel werden nicht serverseitig gespeichert |
 | 🎨 **Themes & Personalisierung** | 4 Themes (Dark, Midnight, Light, Forest) + 5 Akzentfarben, dynamisches `color-scheme` |
 
 ---
@@ -39,12 +47,20 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
    cd cryptotracker
    ```
 
-2. Container bauen und im Hintergrund starten:
+2. Konfiguration anlegen:
+   ```bash
+   cp .env.example .env
+   # AUTH_SECRET setzen:
+   openssl rand -base64 32
+   # Wert in .env eintragen
+   ```
+
+3. Container bauen und im Hintergrund starten:
    ```bash
    docker compose up -d --build
    ```
 
-3. Die App ist direkt erreichbar unter:
+4. Die App ist direkt erreichbar unter:
    [http://localhost:3000](http://localhost:3000) 🎉
 
 ---
@@ -61,8 +77,10 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
    docker run -d \
      --name cryptotracker \
      -p 3000:3000 \
-     -e NEXTAUTH_URL=http://localhost:3000 \
-     -e NEXTAUTH_SECRET=dein-secret-key-hier \
+     -e AUTH_URL=http://localhost:3000 \
+     -e AUTH_SECRET="$(openssl rand -base64 32)" \
+     -e DATABASE_URL=file:/data/cryptotracker.db \
+     -v cryptotracker_data:/data \
      cryptotracker:latest
    ```
 

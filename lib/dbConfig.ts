@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-require-imports --
+   fs und path werden absichtlich per require geladen: Der Edge-Bundler zieht
+   statische Importe ein, und die Middleware wuerde dadurch Node-APIs in die
+   Edge-Runtime schleppen. Die Laufzeitpruefung darunter schuetzt zusaetzlich. */
 export type DbProvider = "sqlite" | "postgresql" | "mysql";
 
 export type DbConfig = {
@@ -70,6 +74,11 @@ export function loadDbConfig(): DbConfig {
     return { type: "postgresql", url: envUrl };
   } else if (envUrl && envUrl.startsWith("mysql")) {
     return { type: "mysql", url: envUrl };
+  } else if (envUrl && (envUrl.startsWith("file:") || envUrl.startsWith("sqlite:"))) {
+    // Ohne diesen Zweig wurde eine per Umgebung gesetzte SQLite-Datei
+    // ignoriert und immer file:./cryptotracker.db verwendet - im Container
+    // landete die Datenbank damit ausserhalb des Volumes.
+    return { type: "sqlite", url: envUrl };
   }
 
   return { type: "sqlite", url: "file:./cryptotracker.db" };

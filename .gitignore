@@ -5,3 +5,17 @@ node_modules/
 out/
 prisma/*.db
 prisma/*.db-journal
+
+# Laufzeit-Konfiguration: legt die App selbst an. Gehoert nicht ins Repo,
+# sonst wandern lokale DB-Zugangsdaten in die Geschichte.
+prisma/db-config.json
+
+# Build-Artefakte
+tsconfig.tsbuildinfo
+*.tsbuildinfo
+
+# Python-Reste im Agent-Werkzeugkasten
+__pycache__/
+*.py[cod]
+
+.DS_Store

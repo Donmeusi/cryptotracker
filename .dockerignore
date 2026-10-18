@@ -2,7 +2,12 @@
 node_modules
 .git
 .gitignore
+.env
+.env.local
 .env*.local
+prisma/db-config.json
+tsconfig.tsbuildinfo
+.agent
 .vscode
 .idea
 Dockerfile
