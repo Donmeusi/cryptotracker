@@ -1,10 +1,11 @@
 import { NextResponse } from "next/server";
+import bcrypt from "bcryptjs";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 export const dynamic = "force-dynamic";
 
-const ALLOWED_CURRENCIES = ["EUR", "USD", "CHF", "GBP", "JPY"];
+const ALLOWED_CURRENCIES = ["EUR"];
 
 // ─── PATCH: Name und Standardwährung speichern ──────────────────────────────
 
@@ -60,6 +61,60 @@ export async function PATCH(req: Request) {
     console.error("Profil speichern fehlgeschlagen:", error);
     return NextResponse.json(
       { error: "Profil konnte nicht gespeichert werden." },
+      { status: 500 }
+    );
+  }
+}
+
+// ─── DELETE: eigenes Konto endgültig löschen ────────────────────────────────
+
+export async function DELETE(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  }
+
+  try {
+    const body = (await req.json().catch(() => ({}))) as {
+      password?: unknown;
+      confirm?: unknown;
+    };
+
+    const user = await db.user.findUnique({
+      where: { id: session.user.id },
+      select: { id: true, password: true },
+    });
+    if (!user) {
+      return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+    }
+
+    if (user.password) {
+      if (
+        typeof body.password !== "string" ||
+        !(await bcrypt.compare(body.password, user.password))
+      ) {
+        return NextResponse.json(
+          { error: "Das Passwort ist falsch. Das Konto wurde nicht gelöscht." },
+          { status: 400 }
+        );
+      }
+    } else if (body.confirm !== "LÖSCHEN") {
+      // SSO-Konten haben kein Passwort; die Bestätigung erfolgt wörtlich.
+      return NextResponse.json(
+        { error: 'Bitte "LÖSCHEN" zur Bestätigung eingeben.' },
+        { status: 400 }
+      );
+    }
+
+    // Kaskadiert über Portfolio auf Holdings/Trades; Accounts, Sessions und
+    // Benachrichtigungen hängen ebenfalls am Benutzer.
+    await db.user.delete({ where: { id: user.id } });
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Kontolöschung fehlgeschlagen:", error);
+    return NextResponse.json(
+      { error: "Konto konnte nicht gelöscht werden." },
       { status: 500 }
     );
   }

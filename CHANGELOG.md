@@ -4,7 +4,30 @@ Alle wichtigen Änderungen am Projekt **CryptoTracker** werden in dieser Datei d
 
 Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) und dieses Projekt hält sich an [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased] - 2026-10-18
+## [Unreleased] - 2026-10-18 (Sicherheits-Härtung)
+
+### Sicherheit (P0)
+- **Admin-Konzept:** System-Endpunkte (`db-config`, `update`, OIDC-Konfiguration) sind auf `ADMIN_EMAILS` beschränkt; ohne Eintrag gesperrt (fail closed).
+- **DB-Konfiguration:** GET/POST nur noch für Admins, keine URL-/Passwortausgabe, PostgreSQL/MySQL werden klar abgelehnt (Schema ist SQLite), kein `prisma db push` mehr im Request, `$queryRaw` statt `$queryRawUnsafe`.
+- **OIDC:** Die wirkungslose UI-Konfiguration ist deaktiviert; Provider kommen ausschließlich aus Umgebungsvariablen. `allowDangerousEmailAccountLinking` entfernt, `email_verified` wird geprüft, doppelter Provider entfernt.
+- **Update-Route:** nur Admin; `repoUrl` und Shell-Interpolation entfernt (`execFile` mit festen Argumenten).
+- **PDF-Upload:** Auth, 10-MB-Limit, Magic-Bytes-Prüfung, Upload-Ratelimit, generische Fehlermeldungen.
+- **Registrierung:** nach dem ersten Konto standardmäßig geschlossen (`ALLOW_REGISTRATION`), Währungsvalidierung, geprüfte Origin, Rate-Limit-Aufräumung.
+- **Login:** Brute-Force-Bremse, Dummy-bcrypt für unbekannte Konten, Sitzungsdauer 7 Tage.
+
+### Sicherheit (P1/P2)
+- Security-Header (CSP, HSTS, X-Frame-Options, nosniff, Referrer-/Permissions-Policy), `X-Powered-By` aus.
+- Exporte: HTML-Escaping und CSV-Formel-Schutz.
+- SMTP-Passwort wird nicht mehr ausgeliefert (`hasSmtpPass`).
+- Passwort ändern und Konto löschen implementiert.
+- Docker: `cap_drop: ALL`, `no-new-privileges`, Healthcheck, `prisma/*.db` im `.dockerignore`.
+- Steuerberechnung: Gebühren in Kostenbasis/Erlös, `TRANSFER_OUT` reduziert den Pool, Rewards als Zufluss mit Hinweis, Überverkauf-Warnungen, Jahreszuordnung Europe/Berlin.
+- PDF-Parser: keine Fantasiewerte mehr (1 Stück/100 €/BTC/Binance), deutsche und englische Zahlenformate.
+- Währungen: nur EUR (Kurse werden nicht umgerechnet), Formatierung crasht nicht bei ungültigem Code.
+- Schema: Indizes auf `Trade(portfolioId, executedAt)`, `Trade(assetId)`, `Account.userId`, `Session.userId`, `Exchange.name`.
+
+### Betrieb
+- Backup-Skript für Unraid (SQLite + Compose + db-config, AES-256, täglich 03:45).
 
 ### Behoben (Fixed)
 - **Dockerfile war nicht baubar:** `apk add --no-exe` ist keine gültige Option (jetzt `--no-cache`), das vom Runner kopierte `public/` fehlte, und `npm ci` scheiterte am Peer-Konflikt zwischen `next-auth@5.0.0-beta` (`nodemailer ^7`) und `nodemailer@8` (jetzt `--legacy-peer-deps`).

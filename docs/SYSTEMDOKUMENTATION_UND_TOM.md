@@ -92,9 +92,11 @@ Die Anwendung verarbeitet folgende Datenkategorien:
 * Der physikalische Zutritt zu den Servern unterliegt den Sicherheitsmaßnahmen des gewählten Rechenzentrumsanbieters bzw. der eigenen IT-Infrastruktur des Betreibers.
 
 #### b) Zugangskontrolle (Systemzugang)
-* Authentifizierungspflicht für alle Administratoren und Benutzer.
-* Erzwungene Passwortkomplexität und Unterbindung unverschlüsselter Übertragungen.
-* Unterstützung von zentraler Mehrfaktor-Authentifizierung (MFA/2FA) über OIDC-Identity-Provider (z. B. Pocket-ID, Keycloak).
+* Authentifizierungspflicht für alle Benutzer; Registrierung ist nach dem ersten Konto standardmäßig geschlossen (`ALLOW_REGISTRATION`).
+* Passwortkomplexität (mind. 8 Zeichen, Großbuchstabe, Zahl), bcrypt mit Kostenfaktor 12, Brute-Force-Bremse für den Login.
+* Systemfunktionen (Update, Datenbank-Konfiguration, OIDC-Anzeige) sind auf `ADMIN_EMAILS` beschränkt.
+* OIDC/SSO wird über Umgebungsvariablen konfiguriert; MFA/2FA wird vom jeweiligen Identity-Provider durchgesetzt, nicht von der App selbst.
+* Unverschlüsselte Übertragungen werden durch den vorgeschalteten Reverse Proxy unterbunden (HTTPS-Terminierung dort), nicht durch die Anwendung.
 
 #### c) Zugriffskontrolle (Datenzugriff)
 * Rollen- und benutzerbasierte Datentrennung: Jeder Benutzer sieht ausschließlich seine eigenen Transaktions- und Portfolio-Daten.
@@ -105,8 +107,8 @@ Die Anwendung verarbeitet folgende Datenkategorien:
 * Entwicklungsdaten enthalten keine Echtdaten aus der Produktivdatenbank.
 
 #### e) Pseudonymisierung & Verschlüsselung (Art. 32 Abs. 1 lit. a DSGVO)
-* **Encryption in Transit:** Alle Webverbindungen werden zwingend über HTTPS / TLS 1.3 verschlüsselt.
-* **Encryption at Rest:** Passwörter werden mittels Einweg-Hashing (bcrypt) gespeichert. Datenbankverbindungen zu externen Servern (PostgreSQL/MySQL) nutzen SSL/TLS-Verschlüsselung (`sslmode=require`).
+* **Encryption in Transit:** Die Anwendung selbst terminiert kein TLS. Für den Internetbetrieb muss ein Reverse Proxy (z. B. Pangolin/Caddy) HTTPS bereitstellen und HTTP umleiten.
+* **Encryption at Rest:** Passwörter werden mittels Einweg-Hashing (bcrypt, Kostenfaktor 12) gespeichert. Externe Server-Datenbanken (PostgreSQL/MySQL) werden derzeit nicht unterstützt; das Schema ist auf SQLite festgelegt.
 
 ---
 
@@ -129,8 +131,8 @@ Die Anwendung verarbeitet folgende Datenkategorien:
 * Entkoppelte Architektur: Ausfälle externer Kurs-APIs führen nicht zum Absturz der Kernanwendung.
 
 #### b) Rasche Wiederherstellbarkeit (Disaster Recovery)
-* Datenbank-Backups können durch einfachen Export der SQLite-Datei (`cryptotracker.db`) oder Standard-Dump-Tools (PostgreSQL `pg_dump`, MySQL `mysqldump`) durchgeführt werden.
-* Automatische Datenbankschema-Synchronisierung via Prisma ORM (`npx prisma db push`).
+* Backup: Die SQLite-Datei (`/data/cryptotracker.db`) wird per `sqlite3 .backup` gesichert; auf Unraid übernimmt das ein User-Script (täglich, verschlüsselt mit `/mnt/user/appdata/backup.key`). Zusätzlich sichern: `db-config.json` und das Compose-Projekt (enthält `AUTH_SECRET`).
+* Datenbankschema wird beim Containerstart per `prisma db push` synchronisiert.
 
 ---
 

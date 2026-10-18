@@ -506,6 +506,8 @@ export default function AssetsClient({
                   Transaktions-Typ und Börse gehören zum Trade und lassen sich hier
                   nicht ändern – Trade-Details bearbeitest du unter &bdquo;Trades&ldquo;.
                   Die Asset-Kategorie gilt für alle Positionen dieses Assets.
+                  Menge und Kaufkurs werden beim nächsten Trade für dieses Asset aus
+                  der Historie neu berechnet.
                 </p>
               )}
 

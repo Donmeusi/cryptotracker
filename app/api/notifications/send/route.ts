@@ -8,6 +8,8 @@ import {
   sendSecurityAlert,
   sendTaxReminder,
 } from "@/lib/email";
+import { fetchLivePrices } from "@/lib/livePrices";
+import { calculateTaxes } from "@/lib/tax/taxCalculator";
 
 type NotificationType =
   | "price-alert"
@@ -52,64 +54,142 @@ export async function POST(req: Request) {
 
   const to = session.user.email;
   const name = session.user.name ?? "Nutzer";
+  const currency = (session.user as { currency?: string }).currency ?? "EUR";
 
   try {
+    // Echte Portfoliodaten statt Beispielwerten.
+    const portfolio = await db.portfolio.findFirst({
+      where: { userId: session.user.id },
+      orderBy: { createdAt: "asc" },
+    });
+    const holdings = portfolio
+      ? await db.holding.findMany({
+          where: { portfolioId: portfolio.id },
+          include: { asset: true },
+        })
+      : [];
+    const prices = await fetchLivePrices();
+    const valued = holdings
+      .map((holding) => {
+        const live = prices[holding.asset.symbol];
+        return {
+          name: holding.asset.name,
+          symbol: holding.asset.symbol,
+          value: holding.amount * (live?.price ?? 0),
+          change: live?.change24h ?? 0,
+          price: live?.price ?? 0,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+    const totalValue = valued.reduce((sum, item) => sum + item.value, 0);
+    const change24h = valued.reduce(
+      (sum, item) => sum + item.value * (item.change / 100),
+      0
+    );
+    const main = valued[0];
+
     switch (type) {
       case "price-alert":
+        if (!main) {
+          return NextResponse.json(
+            { error: "Noch keine Positionen für einen Preisalarm vorhanden." },
+            { status: 400 }
+          );
+        }
         await sendPriceAlert(to, {
-          asset: "Bitcoin",
-          symbol: "BTC",
-          currentPrice: 64_250.00,
-          changePercent: -5.34,
-          currency: (session.user as { currency?: string }).currency ?? "EUR",
+          asset: main.name,
+          symbol: main.symbol,
+          currentPrice: main.price,
+          changePercent: main.change,
+          currency,
         });
         break;
 
       case "portfolio-summary":
         await sendPortfolioSummary(to, {
           name,
-          totalValue: 24_387.50,
-          change24h: -312.40,
-          topAssets: [
-            { name: "Bitcoin", symbol: "BTC", value: 14_200.00, change: -5.34 },
-            { name: "Ethereum", symbol: "ETH", value: 7_430.00, change: 2.11 },
-            { name: "Solana", symbol: "SOL", value: 2_757.50, change: 8.92 },
-          ],
-          currency: (session.user as { currency?: string }).currency ?? "EUR",
+          totalValue,
+          change24h,
+          topAssets: valued.slice(0, 3).map((item) => ({
+            name: item.name,
+            symbol: item.symbol,
+            value: item.value,
+            change: item.change,
+          })),
+          currency,
         });
         break;
 
-      case "trade-confirm":
+      case "trade-confirm": {
+        const lastTrade = portfolio
+          ? await db.trade.findFirst({
+              where: { portfolioId: portfolio.id },
+              include: { asset: true, exchange: true },
+              orderBy: { executedAt: "desc" },
+            })
+          : null;
+        if (!lastTrade) {
+          return NextResponse.json(
+            { error: "Noch kein Trade für eine Bestätigung vorhanden." },
+            { status: 400 }
+          );
+        }
         await sendTradeConfirmation(to, {
-          type: "BUY",
-          asset: "Bitcoin",
-          symbol: "BTC",
-          amount: 0.05,
-          price: 64_250.00,
-          total: 3_212.50,
-          fee: 9.64,
-          exchange: "Binance",
-          currency: (session.user as { currency?: string }).currency ?? "EUR",
+          type: lastTrade.type,
+          asset: lastTrade.asset.name,
+          symbol: lastTrade.asset.symbol,
+          amount: lastTrade.amount,
+          price: lastTrade.price,
+          total: lastTrade.amount * lastTrade.price,
+          fee: lastTrade.fee,
+          exchange:
+            lastTrade.exchange?.displayName || lastTrade.exchange?.name || "—",
+          currency,
         });
         break;
+      }
 
       case "security":
         await sendSecurityAlert(to, {
           event: "test",
-          device: "Windows · Chrome",
-          location: "Deutschland",
-          ip: "127.0.0.1",
+          device: "Testbenachrichtigung",
+          location: "—",
+          ip: "—",
         });
         break;
 
-      case "tax-reminder":
+      case "tax-reminder": {
+        const year = String(new Date().getFullYear() - 1);
+        const rows = portfolio
+          ? await db.trade.findMany({
+              where: { portfolioId: portfolio.id },
+              include: { asset: true, exchange: true },
+              orderBy: { executedAt: "asc" },
+            })
+          : [];
+        const tax = calculateTaxes(
+          rows.map((row) => ({
+            id: row.id,
+            asset: row.asset.symbol,
+            type: row.type,
+            exchange:
+              row.exchange?.displayName || row.exchange?.name || "",
+            amount: row.amount,
+            price: row.price,
+            fee: row.fee,
+            executedAt: row.executedAt.toISOString(),
+          })),
+          year,
+          "FIFO"
+        );
         await sendTaxReminder(to, {
-          year: new Date().getFullYear() - 1,
-          totalGainLoss: 5_923.00,
-          taxableEvents: 14,
-          currency: (session.user as { currency?: string }).currency ?? "EUR",
+          year: Number(year),
+          totalGainLoss: tax.summary.taxableIncome,
+          taxableEvents: tax.events.length,
+          currency,
         });
         break;
+      }
     }
 
     return NextResponse.json({ success: true, message: `Test-E-Mail (${type}) wurde gesendet.` });

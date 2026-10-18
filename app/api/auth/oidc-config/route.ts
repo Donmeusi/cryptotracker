@@ -1,86 +1,74 @@
 import { NextResponse } from "next/server";
 import { db } from "@/lib/db";
+import { adminErrorResponse, getAdminSession } from "@/lib/authz";
 
-// GET /api/auth/oidc-config
-export async function GET() {
-  try {
-    const config = await db.oidcSettings.findUnique({
-      where: { id: "default" },
-    });
+export const dynamic = "force-dynamic";
 
-    // Fallback to process.env if DB not populated yet
-    const envIssuer = process.env.OIDC_ISSUER;
-    const envClientId = process.env.OIDC_CLIENT_ID;
-    const envClientName = process.env.OIDC_CLIENT_NAME || "Pocket-ID";
-    const envEnabled = Boolean(envIssuer && envClientId);
+// OIDC wird aus Umgebungsvariablen konfiguriert, weil NextAuth die Provider
+// beim Start des Moduls aufbaut. Die frühere UI-Konfiguration schrieb nur in
+// die Datenbank und hatte keine Wirkung - sie ist deshalb deaktiviert.
 
-    if (!config) {
-      return NextResponse.json({
-        enabled: envEnabled,
-        issuer: envIssuer || "",
-        clientId: envClientId || "",
-        hasSecret: Boolean(process.env.OIDC_CLIENT_SECRET),
-        clientName: envClientName,
-      });
-    }
-
-    return NextResponse.json({
-      enabled: config.enabled ?? envEnabled,
-      issuer: config.issuer || envIssuer || "",
-      clientId: config.clientId || envClientId || "",
-      hasSecret: Boolean(config.clientSecret || process.env.OIDC_CLIENT_SECRET),
-      clientName: config.clientName || envClientName,
-    });
-  } catch (error: unknown) {
-    console.error("Failed to fetch OIDC config:", error);
-    return NextResponse.json({ error: "Failed to fetch OIDC config" }, { status: 500 });
-  }
+function envConfig() {
+  return {
+    enabled: Boolean(process.env.OIDC_ISSUER && process.env.OIDC_CLIENT_ID),
+    issuer: process.env.OIDC_ISSUER || "",
+    clientId: process.env.OIDC_CLIENT_ID || "",
+    clientName: process.env.OIDC_CLIENT_NAME || "Single Sign-On",
+    hasSecret: Boolean(process.env.OIDC_CLIENT_SECRET),
+  };
 }
 
-// PUT /api/auth/oidc-config
-export async function PUT(req: Request) {
-  try {
-    const body = await req.json();
-    const { enabled, issuer, clientId, clientSecret, clientName } = body;
+// ─── GET: öffentlich nur das Nötigste für die Anmeldeseite ──────────────────
 
-    const dataToUpdate: {
-      enabled: boolean;
-      issuer: string | null;
-      clientId: string | null;
-      clientName: string;
-      clientSecret?: string;
-    } = {
-      enabled: Boolean(enabled),
-      issuer: issuer ? String(issuer).trim() : null,
-      clientId: clientId ? String(clientId).trim() : null,
-      clientName: clientName ? String(clientName).trim() : "Single Sign-On",
-    };
+export async function GET() {
+  const env = envConfig();
+  const admin = await getAdminSession();
 
-    if (clientSecret !== undefined && clientSecret !== "") {
-      dataToUpdate.clientSecret = String(clientSecret).trim();
-    }
-
-    const updated = await db.oidcSettings.upsert({
-      where: { id: "default" },
-      create: {
-        id: "default",
-        ...dataToUpdate,
-      },
-      update: dataToUpdate,
-    });
-
+  if (admin.status !== 200) {
     return NextResponse.json({
-      success: true,
-      config: {
-        enabled: updated.enabled,
-        issuer: updated.issuer,
-        clientId: updated.clientId,
-        clientName: updated.clientName,
-        hasSecret: Boolean(updated.clientSecret),
-      },
+      enabled: env.enabled,
+      clientName: env.clientName,
     });
-  } catch (error: unknown) {
-    console.error("Failed to save OIDC config:", error);
-    return NextResponse.json({ error: "Failed to save OIDC config" }, { status: 500 });
   }
+
+  let stored = null;
+  try {
+    const config = await db.oidcSettings.findUnique({ where: { id: "default" } });
+    stored = config
+      ? {
+          enabled: config.enabled,
+          issuer: config.issuer || "",
+          clientId: config.clientId || "",
+          clientName: config.clientName || "",
+          hasSecret: Boolean(config.clientSecret),
+        }
+      : null;
+  } catch (error) {
+    console.error("OIDC-Konfiguration konnte nicht gelesen werden:", error);
+  }
+
+  return NextResponse.json({
+    ...env,
+    activeSource: "env",
+    stored,
+  });
+}
+
+// ─── PUT: bewusst deaktiviert (nur Admin darf es überhaupt versuchen) ───────
+
+export async function PUT() {
+  const admin = await getAdminSession();
+  if (admin.status !== 200) {
+    return NextResponse.json(adminErrorResponse(admin.status), {
+      status: admin.status,
+    });
+  }
+
+  return NextResponse.json(
+    {
+      error:
+        "OIDC wird über Umgebungsvariablen konfiguriert (OIDC_ISSUER, OIDC_CLIENT_ID, OIDC_CLIENT_SECRET, OIDC_CLIENT_NAME). Die Oberflächen-Konfiguration ist deaktiviert.",
+    },
+    { status: 409 }
+  );
 }

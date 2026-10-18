@@ -14,9 +14,8 @@ export async function GET() {
     where: { userId: session.user.id },
   });
 
-  // Rückgabe der Standardwerte, falls noch keine Einstellungen vorhanden
-  return NextResponse.json(
-    settings ?? {
+  if (!settings) {
+    return NextResponse.json({
       priceAlerts: true,
       portfolioSummary: true,
       tradeConfirm: false,
@@ -25,10 +24,18 @@ export async function GET() {
       smtpHost: "",
       smtpPort: "",
       smtpUser: "",
-      smtpPass: "",
       smtpFrom: "",
-    }
-  );
+      hasSmtpPass: false,
+    });
+  }
+
+  // Das SMTP-Passwort verlässt den Server nicht. Die UI erfährt nur, ob eins
+  // hinterlegt ist.
+  const { smtpPass, ...safeSettings } = settings;
+  return NextResponse.json({
+    ...safeSettings,
+    hasSmtpPass: Boolean(smtpPass),
+  });
 }
 
 // ─── PUT: Einstellungen speichern ─────────────────────────────────────────────
@@ -63,7 +70,11 @@ export async function PUT(req: Request) {
   if (body.smtpHost !== undefined) updateData.smtpHost = body.smtpHost;
   if (body.smtpPort !== undefined) updateData.smtpPort = body.smtpPort;
   if (body.smtpUser !== undefined) updateData.smtpUser = body.smtpUser;
-  if (body.smtpPass !== undefined) updateData.smtpPass = body.smtpPass;
+  // Ein leeres Feld bedeutet "unverändert lassen", damit die UI das Passwort
+  // nicht kennen muss.
+  if (body.smtpPass !== undefined && body.smtpPass !== "") {
+    updateData.smtpPass = body.smtpPass;
+  }
   if (body.smtpFrom !== undefined) updateData.smtpFrom = body.smtpFrom;
 
   const settings = await db.notificationSettings.upsert({

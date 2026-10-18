@@ -15,3 +15,8 @@ docker-compose.yml
 README.md
 LICENSE
 CHANGELOG.md
+
+# Laufzeitdatenbanken gehoeren nie ins Image
+prisma/*.db
+prisma/*.db-journal
+*.tsbuildinfo

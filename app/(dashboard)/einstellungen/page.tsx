@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { useSession } from "next-auth/react";
+import { signOut, useSession } from "next-auth/react";
 import {
   User, Shield, Database, Bell, Palette, ChevronRight,
   CheckCircle, Download, LayoutGrid, Layers, Image as ImageIcon,
@@ -10,13 +10,9 @@ import {
 } from "lucide-react";
 import { downloadCSV, downloadJSON } from "@/lib/exportUtils";
 
-const WAEHRUNGEN = [
-  { code: "EUR", name: "Euro (€)" },
-  { code: "USD", name: "US-Dollar ($)" },
-  { code: "CHF", name: "Schweizer Franken (CHF)" },
-  { code: "GBP", name: "Britisches Pfund (£)" },
-  { code: "JPY", name: "Japanischer Yen (¥)" },
-];
+// Kurse werden ausschliesslich in EUR gefuehrt; andere Waehrungen
+// wuerden nur das Symbol tauschen und falsche Werte zeigen.
+const WAEHRUNGEN = [{ code: "EUR", name: "Euro (€)" }];
 
 type Tab = "profil" | "sicherheit" | "erscheinungsbild" | "module" | "benachrichtigungen" | "datenbank" | "system";
 
@@ -462,6 +458,7 @@ type NotificationSettings = {
   smtpUser?: string;
   smtpPass?: string;
   smtpFrom?: string;
+  hasSmtpPass?: boolean;
 };
 
 function NotificationsPanel({ userEmail }: { userEmail?: string }) {
@@ -485,8 +482,9 @@ function NotificationsPanel({ userEmail }: { userEmail?: string }) {
             smtpHost: data.smtpHost ?? "",
             smtpPort: data.smtpPort ?? "",
             smtpUser: data.smtpUser ?? "",
-            smtpPass: data.smtpPass ?? "",
+            smtpPass: "",
             smtpFrom: data.smtpFrom ?? "",
+            hasSmtpPass: Boolean(data.hasSmtpPass),
           });
         }
         setLoading(false);
@@ -643,11 +641,18 @@ function NotificationsPanel({ userEmail }: { userEmail?: string }) {
             />
           </div>
           <div className="input-group">
-            <label className="label">SMTP Passwort (App-Passwort)</label>
+            <label className="label">
+              SMTP Passwort (App-Passwort)
+              {settings?.hasSmtpPass && (
+                <span style={{ color: "var(--green)", fontSize: "11px", marginLeft: 6 }}>
+                  (hinterlegt – leer lassen zum Beibehalten)
+                </span>
+              )}
+            </label>
             <input
               type="password"
               className="input"
-              placeholder="••••••••"
+              placeholder={settings?.hasSmtpPass ? "•••••••• (unverändert lassen)" : "App-Passwort"}
               value={settings?.smtpPass || ""}
               onChange={(e) => settings && setSettings({ ...settings, smtpPass: e.target.value })}
             />
@@ -690,152 +695,105 @@ type OidcFormState = {
 };
 
 function OidcSettingsPanel() {
-  const [form, setForm] = useState<OidcFormState>({
-    enabled: false,
-    issuer: "",
-    clientId: "",
-    clientSecret: "",
-    clientName: "Single Sign-On",
-  });
+  const [config, setConfig] = useState<{
+    enabled?: boolean;
+    issuer?: string;
+    clientId?: string;
+    clientName?: string;
+    hasSecret?: boolean;
+    error?: string;
+  } | null>(null);
+  const [origin, setOrigin] = useState("");
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
 
   useEffect(() => {
+    setOrigin(window.location.origin);
     fetch("/api/auth/oidc-config")
-      .then((res) => res.json())
-      .then((data) => {
-        if (!data.error) {
-          setForm({
-            enabled: Boolean(data.enabled),
-            issuer: data.issuer || "",
-            clientId: data.clientId || "",
-            clientSecret: "",
-            clientName: data.clientName || "Pocket-ID / SSO",
-            hasSecret: Boolean(data.hasSecret),
-          });
-        }
-        setLoading(false);
+      .then(async (res) => {
+        const data = await res.json();
+        setConfig(res.ok ? data : { error: data.error || "Nicht verfügbar" });
       })
-      .catch(() => setLoading(false));
+      .catch(() => setConfig({ error: "Nicht verfügbar" }))
+      .finally(() => setLoading(false));
   }, []);
 
-  async function handleSave() {
-    setSaving(true);
-    try {
-      const res = await fetch("/api/auth/oidc-config", {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      if (res.ok) {
-        setSaved(true);
-        setTimeout(() => setSaved(false), 2500);
-      }
-    } finally {
-      setSaving(false);
-    }
+  if (loading) {
+    return (
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+        Lade OIDC-Konfiguration...
+      </div>
+    );
   }
 
-  if (loading) {
-    return <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>Lade OIDC Einstellungen...</div>;
+  if (config?.error) {
+    return (
+      <div style={{ marginTop: "var(--space-2)" }}>
+        <h2 className="settings-section-title">Single Sign-On (OIDC)</h2>
+        <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>
+          Die OIDC-Konfiguration ist nur für Administratoren sichtbar.
+        </p>
+      </div>
+    );
   }
 
   return (
     <div style={{ marginTop: "var(--space-2)" }}>
-      <h2 className="settings-section-title">
-        Single Sign-On (OIDC / Pocket-ID / Keycloak / Authentik)
-      </h2>
+      <h2 className="settings-section-title">Single Sign-On (OIDC)</h2>
       <p style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)", marginBottom: "var(--space-4)" }}>
-        Konfiguriere deinen eigenen OpenID Connect Provider direkt über die UI.
+        OIDC wird über Umgebungsvariablen konfiguriert und beim Start geladen.
+        Änderungen an <code className="code">OIDC_ISSUER</code>,{" "}
+        <code className="code">OIDC_CLIENT_ID</code>,{" "}
+        <code className="code">OIDC_CLIENT_SECRET</code> und{" "}
+        <code className="code">OIDC_CLIENT_NAME</code> werden erst nach einem
+        Neustart wirksam. Die frühere Konfiguration über diese Oberfläche ist
+        deaktiviert.
       </p>
 
-      {/* Enable toggle */}
-      <div style={{
-        display: "flex", alignItems: "center", justifyContent: "space-between",
-        padding: "var(--space-4)", background: "var(--bg-surface)",
-        borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: "var(--space-4)"
-      }}>
-        <div>
-          <div style={{ fontWeight: 600, fontSize: "var(--text-sm)", color: "var(--text-primary)" }}>
-            OIDC / SSO Login aktivieren
-          </div>
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: 2 }}>
-            Zeigt den SSO-Login Button auf der Anmeldeseite an
-          </div>
-        </div>
-        <label className="toggle">
-          <input
-            type="checkbox"
-            checked={form.enabled}
-            onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
-          />
-          <span className="toggle-track"><span className="toggle-thumb" /></span>
-        </label>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
-        <div className="input-group">
-          <label className="label">Anzeige-Name auf Login-Button</label>
-          <input
-            type="text"
-            className="input"
-            placeholder="z.B. Pocket-ID oder Keycloak"
-            value={form.clientName}
-            onChange={(e) => setForm({ ...form, clientName: e.target.value })}
-          />
-        </div>
-        <div className="input-group">
-          <label className="label">OIDC Issuer URL (Server-Adresse)</label>
-          <input
-            type="text"
-            className="input"
-            placeholder="http://localhost:8080 oder https://auth.deine-domain.de"
-            value={form.issuer}
-            onChange={(e) => setForm({ ...form, issuer: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "var(--space-4)", marginBottom: "var(--space-4)" }}>
-        <div className="input-group">
-          <label className="label">Client ID</label>
-          <input
-            type="text"
-            className="input"
-            placeholder="z.B. cryptotracker"
-            value={form.clientId}
-            onChange={(e) => setForm({ ...form, clientId: e.target.value })}
-          />
-        </div>
-        <div className="input-group">
-          <label className="label">
-            Client Secret {form.hasSecret && <span style={{ color: "var(--green)", fontSize: "11px" }}>(bereits hinterlegt)</span>}
-          </label>
-          <input
-            type="password"
-            className="input"
-            placeholder={form.hasSecret ? "•••••••• (unverändert lassen)" : "Geheimes Secret"}
-            value={form.clientSecret}
-            onChange={(e) => setForm({ ...form, clientSecret: e.target.value })}
-          />
-        </div>
-      </div>
-
-      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", background: "var(--bg-surface)", padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)", marginBottom: "var(--space-4)" }}>
-        <div><strong>Wichtig – Redirect-URI im OIDC Provider eintragen:</strong></div>
-        <code className="code" style={{ marginTop: 4, display: "inline-block" }}>http://localhost:3000/api/auth/callback/oidc</code>
-      </div>
-
-      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-        <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-          {saving ? "Wird gespeichert..." : "OIDC Einstellungen speichern"}
-        </button>
-        {saved && (
-          <span className="save-feedback success">
-            <CheckCircle size={14} /> OIDC Konfiguration gespeichert & aktiv
+      <div
+        style={{
+          background: "var(--bg-surface)",
+          border: "1px solid var(--border)",
+          borderRadius: "var(--radius-md)",
+          padding: "var(--space-4)",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-3)",
+          marginBottom: "var(--space-4)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Status</span>
+          <span className={`badge ${config?.enabled ? "badge-green" : "badge-neutral"}`}>
+            {config?.enabled ? "Aktiv" : "Inaktiv"}
           </span>
-        )}
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Anzeigename</span>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-primary)" }}>
+            {config?.clientName || "—"}
+          </span>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between", gap: "var(--space-4)" }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Issuer</span>
+          <code className="code" style={{ fontSize: "12px" }}>{config?.issuer || "—"}</code>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Client-ID</span>
+          <code className="code" style={{ fontSize: "12px" }}>{config?.clientId || "—"}</code>
+        </div>
+        <div style={{ display: "flex", justifyContent: "space-between" }}>
+          <span style={{ fontSize: "var(--text-sm)", color: "var(--text-muted)" }}>Client-Secret</span>
+          <span style={{ fontSize: "var(--text-sm)", color: config?.hasSecret ? "var(--green)" : "var(--text-muted)" }}>
+            {config?.hasSecret ? "hinterlegt" : "nicht hinterlegt"}
+          </span>
+        </div>
+      </div>
+
+      <div style={{ fontSize: "var(--text-xs)", color: "var(--text-secondary)", background: "var(--bg-surface)", padding: "var(--space-3) var(--space-4)", borderRadius: "var(--radius-md)", border: "1px solid var(--border)" }}>
+        <div><strong>Redirect-URI im OIDC Provider eintragen:</strong></div>
+        <code className="code" style={{ marginTop: 4, display: "inline-block" }}>
+          {origin || "https://deine-domain"}/api/auth/callback/oidc
+        </code>
       </div>
     </div>
   );
@@ -1502,6 +1460,8 @@ export default function EinstellungenPage() {
 
   const [activeTab, setActiveTab] = useState<Tab>("profil");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [pwStatus, setPwStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
+  const [pwError, setPwError] = useState("");
 
   async function handleProfileSave() {
     const name = (document.getElementById("s-name") as HTMLInputElement | null)?.value?.trim() ?? "";
@@ -1601,6 +1561,75 @@ export default function EinstellungenPage() {
     } catch (error) {
       alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
     }
+  }
+
+  async function handlePasswordChange() {
+    setPwError("");
+    const current = (document.getElementById("s-curr-pw") as HTMLInputElement | null)?.value ?? "";
+    const next = (document.getElementById("s-new-pw") as HTMLInputElement | null)?.value ?? "";
+    const confirm = (document.getElementById("s-confirm-pw") as HTMLInputElement | null)?.value ?? "";
+
+    if (!current || !next || !confirm) {
+      setPwError("Bitte alle drei Felder ausfüllen.");
+      return;
+    }
+    if (next !== confirm) {
+      setPwError("Die neuen Passwörter stimmen nicht überein.");
+      return;
+    }
+
+    setPwStatus("saving");
+    try {
+      const res = await fetch("/api/profile/password", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ currentPassword: current, newPassword: next }),
+      });
+      const data = (await res.json().catch(() => ({}))) as { error?: string };
+      if (!res.ok) throw new Error(data.error ?? "Passwort konnte nicht geändert werden.");
+
+      setPwStatus("saved");
+      for (const id of ["s-curr-pw", "s-new-pw", "s-confirm-pw"]) {
+        const field = document.getElementById(id) as HTMLInputElement | null;
+        if (field) field.value = "";
+      }
+    } catch (error) {
+      setPwStatus("error");
+      setPwError(error instanceof Error ? error.message : "Passwort konnte nicht geändert werden.");
+    } finally {
+      setTimeout(() => setPwStatus("idle"), 3000);
+    }
+  }
+
+  async function handleDeleteAccount() {
+    if (
+      !window.confirm(
+        "Möchtest du dein Konto wirklich endgültig löschen? Alle Portfolios, Trades und Einstellungen werden entfernt."
+      )
+    ) {
+      return;
+    }
+
+    const secret = window.prompt(
+      'Bestätige mit deinem Passwort (bei SSO-Konten: "LÖSCHEN"):'
+    );
+    if (secret === null) return;
+
+    const body =
+      secret === "LÖSCHEN" ? { confirm: secret } : { password: secret };
+
+    const res = await fetch("/api/profile", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+    const data = (await res.json().catch(() => ({}))) as { error?: string };
+    if (!res.ok) {
+      alert(data.error ?? "Konto konnte nicht gelöscht werden.");
+      return;
+    }
+
+    await signOut({ callbackUrl: "/anmelden" });
   }
 
   return (
@@ -1706,17 +1735,24 @@ export default function EinstellungenPage() {
                   <label className="label" htmlFor="s-confirm-pw">Passwort bestätigen</label>
                   <input id="s-confirm-pw" className="input" type="password" placeholder="••••••••" />
                 </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)", flexWrap: "wrap" }}>
                   <button
                     className="btn btn-secondary"
-                    disabled
-                    title="Passwortänderung ist noch nicht implementiert."
+                    onClick={handlePasswordChange}
+                    disabled={pwStatus === "saving"}
                   >
-                    Passwort aktualisieren
+                    {pwStatus === "saving" ? "Wird geändert..." : "Passwort aktualisieren"}
                   </button>
-                  <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                    Passwortänderung ist noch nicht verfügbar.
-                  </span>
+                  {pwStatus === "saved" && (
+                    <span className="save-feedback success">
+                      <CheckCircle size={14} /> Passwort geändert
+                    </span>
+                  )}
+                  {pwError && (
+                    <span style={{ fontSize: "var(--text-sm)", color: "var(--red)" }}>
+                      {pwError}
+                    </span>
+                  )}
                 </div>
               </div>
 
@@ -1821,12 +1857,8 @@ export default function EinstellungenPage() {
                   Diese Aktionen sind unwiderruflich. Bitte mit Vorsicht verwenden.
                 </p>
                 <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
-                  <button
-                    className="btn btn-danger"
-                    disabled
-                    title="Konto-Deaktivierung ist noch nicht implementiert."
-                  >
-                    Account deaktivieren
+                  <button className="btn btn-danger" onClick={handleDeleteAccount}>
+                    Konto löschen
                   </button>
                   <button className="btn btn-danger" onClick={handleDeleteAllData}>
                     Alle Daten löschen

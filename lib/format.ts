@@ -7,21 +7,31 @@ export function formatCurrency(
   currency: string = "EUR",
   compact: boolean = false
 ): string {
-  if (compact && Math.abs(value) >= 1000000) {
+  try {
+    if (compact && Math.abs(value) >= 1000000) {
+      return new Intl.NumberFormat("de-DE", {
+        style: "currency",
+        currency,
+        notation: "compact",
+        maximumFractionDigits: 2,
+      }).format(value);
+    }
+
     return new Intl.NumberFormat("de-DE", {
       style: "currency",
       currency,
-      notation: "compact",
-      maximumFractionDigits: 2,
+      minimumFractionDigits: 2,
+      maximumFractionDigits: Math.abs(value) < 1 ? 6 : 2,
+    }).format(value);
+  } catch {
+    // Ungültiger Währungscode: lieber EUR anzeigen als die Seite crashen.
+    return new Intl.NumberFormat("de-DE", {
+      style: "currency",
+      currency: "EUR",
+      minimumFractionDigits: 2,
+      maximumFractionDigits: Math.abs(value) < 1 ? 6 : 2,
     }).format(value);
   }
-
-  return new Intl.NumberFormat("de-DE", {
-    style: "currency",
-    currency,
-    minimumFractionDigits: 2,
-    maximumFractionDigits: Math.abs(value) < 1 ? 6 : 2,
-  }).format(value);
 }
 
 export function formatPercent(value: number): string {

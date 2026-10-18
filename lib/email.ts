@@ -1,6 +1,19 @@
 import nodemailer from "nodemailer";
 import { db } from "@/lib/db";
 
+// Werte aus der Datenbank (Asset-Namen, Börsen, Nutzernamen) werden in HTML
+// eingesetzt und müssen escaped werden.
+function escapeHtml(value: unknown): string {
+  const replacements: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return String(value ?? "").replace(/[&<>"']/g, (c) => replacements[c]);
+}
+
 // ─── Dynamischer Transporter ──────────────────────────────────────────────────
 
 async function getTransporterForUser(email: string) {
@@ -134,8 +147,8 @@ export async function sendPriceAlert(to: string, data: PriceAlertData) {
     new Intl.NumberFormat("de-DE", { style: "currency", currency, minimumFractionDigits: 2 }).format(n);
 
   const body = `
-    ${heading(`${arrow} Preisalarm: ${asset}`)}
-    ${subtext(`${symbol} hat eine signifikante Kursbewegung verzeichnet.`)}
+    ${heading(`${arrow} Preisalarm: ${escapeHtml(asset)}`)}
+    ${subtext(`${escapeHtml(symbol)} hat eine signifikante Kursbewegung verzeichnet.`)}
     <table width="100%" cellpadding="8" cellspacing="8" style="border-collapse:separate;border-spacing:8px;">
       <tr>
         ${statCard("Aktueller Kurs", fmt(currentPrice))}
@@ -148,7 +161,7 @@ export async function sendPriceAlert(to: string, data: PriceAlertData) {
     </p>
   `;
   // override color on change card
-  const html = wrap(`Preisalarm – ${symbol}`, body).replace(
+  const html = wrap(`Preisalarm – ${escapeHtml(symbol)}`, body).replace(
     `${isUp ? "+" : ""}${changePercent.toFixed(2)}%`,
     `<span style="color:${color};font-weight:700;">${isUp ? "+" : ""}${changePercent.toFixed(2)}%</span>`
   );
@@ -180,8 +193,8 @@ export async function sendPortfolioSummary(to: string, data: PortfolioSummaryDat
       (a) => `
     <tr>
       <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);">
-        <span style="font-weight:600;color:#f1f5f9;font-size:13px;">${a.name}</span>
-        <span style="font-size:11px;color:#64748b;margin-left:6px;">${a.symbol}</span>
+        <span style="font-weight:600;color:#f1f5f9;font-size:13px;">${escapeHtml(a.name)}</span>
+        <span style="font-size:11px;color:#64748b;margin-left:6px;">${escapeHtml(a.symbol)}</span>
       </td>
       <td style="padding:10px 0;border-bottom:1px solid rgba(255,255,255,0.05);text-align:right;">
         <span style="font-size:13px;color:#f1f5f9;">${fmt(a.value)}</span>
@@ -196,7 +209,7 @@ export async function sendPortfolioSummary(to: string, data: PortfolioSummaryDat
     .join("");
 
   const body = `
-    ${heading(`Guten Abend, ${name}!`)}
+    ${heading(`Guten Abend, ${escapeHtml(name)}!`)}
     ${subtext(`Deine Portfolio-Zusammenfassung für ${date}`)}
     <table width="100%" cellpadding="8" cellspacing="8" style="border-collapse:separate;border-spacing:8px;margin-bottom:24px;">
       <tr>
@@ -258,13 +271,13 @@ export async function sendTradeConfirmation(to: string, data: TradeConfirmData) 
   const color = ["BUY", "TRANSFER_IN", "STAKING_REWARD", "AIRDROP", "MINING"].includes(type) ? "#22c55e" : "#f59e0b";
 
   const rows = [
-    ["Asset", `${asset} (${symbol})`],
+    ["Asset", `${escapeHtml(asset)} (${escapeHtml(symbol)})`],
     ["Art", label],
-    ["Menge", `${amount.toLocaleString("de-DE", { maximumFractionDigits: 8 })} ${symbol}`],
+    ["Menge", `${amount.toLocaleString("de-DE", { maximumFractionDigits: 8 })} ${escapeHtml(symbol)}`],
     ["Kurs", fmt(price)],
     ["Gesamtwert", fmt(total)],
     ["Gebühr", fmt(fee)],
-    ...(exchange ? [["Börse", exchange]] : []),
+    ...(exchange ? [["Börse", escapeHtml(exchange)]] : []),
     ["Datum", new Date().toLocaleString("de-DE")],
   ]
     .map(

@@ -162,7 +162,10 @@ export default function SteuernPage() {
 
         <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
           <Info size={12} />
-          <span>{selectedMethod}-Methode aktiv &middot; Steuerjahr {selectedYear}</span>
+          <span>
+            {selectedMethod}-Methode aktiv &middot; Steuerjahr {selectedYear} &middot;
+            FIFO entspricht der Verwaltungspraxis, LIFO/HIFO dienen nur der Analyse
+          </span>
         </div>
       </div>
 
@@ -174,9 +177,30 @@ export default function SteuernPage() {
         <div className="stat-card" style={{ borderColor: "rgba(245,158,11,0.2)" }}>
           <div className="stat-label"><Calculator size={12} style={{ display: "inline", marginRight: 4 }} />Gesch. Steuer (DE)</div>
           <div className="stat-value mono" style={{ fontSize: "var(--text-2xl)", color: "var(--gold)" }}>{formatCurrency(estimatedTax, "EUR")}</div>
-          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>~25% Abgeltungssteuer</div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+            Orientierung (26,375 %; persönlicher Satz kann abweichen)
+          </div>
         </div>
       </div>
+
+      {taxData?.warnings && taxData.warnings.length > 0 && (
+        <div
+          className="card"
+          style={{
+            borderColor: "rgba(245,158,11,0.3)",
+            marginBottom: "var(--space-5)",
+          }}
+        >
+          <h2 style={{ fontSize: "var(--text-base)", fontWeight: 600, color: "var(--gold)", marginBottom: "var(--space-3)" }}>
+            Hinweise zur Berechnung
+          </h2>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: "var(--text-sm)", color: "var(--text-secondary)", display: "flex", flexDirection: "column", gap: 4 }}>
+            {taxData.warnings.map((warning, index) => (
+              <li key={index}>{warning}</li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Tabelle */}
       <div className="card">

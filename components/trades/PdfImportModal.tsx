@@ -94,15 +94,17 @@ export default function PdfImportModal({ isOpen, onClose, onImportTrades }: PdfI
   }
 
   function handleAddTradeRow() {
+    // Leere Zeile statt Fantasiewerten: Asset, Menge, Kurs und Datum müssen
+    // ausgefüllt werden.
     const newTrade: ParsedTrade = {
       id: `manual-pdf-${Date.now()}`,
-      asset: "BTC",
+      asset: "",
       type: "BUY",
-      amount: 1,
-      price: 100,
+      amount: 0,
+      price: 0,
       fee: 0,
       feeCurrency: "EUR",
-      exchange: "Binance",
+      exchange: "",
       executedAt: new Date().toISOString().slice(0, 16),
       notes: "Manuell hinzugefügt",
       confidence: 100,
@@ -119,6 +121,28 @@ export default function PdfImportModal({ isOpen, onClose, onImportTrades }: PdfI
       setError("Keine Trades zum Importieren ausgewählt.");
       return;
     }
+
+    const invalid = parsedTrades
+      .map((trade, index) => ({ trade, index }))
+      .filter(
+        ({ trade }) =>
+          !trade.asset.trim() ||
+          !Number.isFinite(trade.amount) ||
+          trade.amount <= 0 ||
+          !Number.isFinite(trade.price) ||
+          trade.price <= 0 ||
+          !trade.executedAt
+      );
+
+    if (invalid.length > 0) {
+      setError(
+        `Bitte ergänze Asset, Menge, Kurs und Datum in Zeile ${invalid
+          .map(({ index }) => index + 1)
+          .join(", ")}.`
+      );
+      return;
+    }
+
     onImportTrades(parsedTrades);
     handleReset();
     onClose();
@@ -143,7 +167,8 @@ export default function PdfImportModal({ isOpen, onClose, onImportTrades }: PdfI
             <div>
               <h2 className="pdf-modal-title">Trade-Erfassung per PDF-Import</h2>
               <p className="pdf-modal-sub">
-                Lade Abrechnungen oder Kaufbelege (Trade Republic, Bitpanda, Coinbase, Binance u.v.m.) hoch.
+                Lade eine Abrechnung oder einen Kaufbeleg hoch. Es wird ein Trade
+                pro PDF erkannt; fehlende Werte ergänzt du in der Vorschau.
               </p>
             </div>
           </div>

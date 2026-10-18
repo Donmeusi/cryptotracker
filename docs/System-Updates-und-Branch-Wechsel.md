@@ -6,6 +6,8 @@ CryptoTracker verfügt über ein integriertes Update- und Kanal-Management direk
 
 ## 🔄 Versionsprüfung & Kanal-Wechsel
 
+> **Zugriff:** Update und Kanalwechsel sind auf die in `ADMIN_EMAILS` eingetragenen Adressen beschränkt. Ohne Eintrag sind die System-Endpunkte gesperrt.
+
 Unter **Einstellungen → System & Updates** ([http://localhost:3000/einstellungen](http://localhost:3000/einstellungen)):
 
 1. **Versions-Übersicht:**

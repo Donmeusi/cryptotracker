@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import bcrypt from "bcryptjs";
 import { NextRequest, NextResponse } from "next/server";
+import { isValidPassword } from "@/lib/password";
 
 // ─── SEC-03: In-Memory Rate Limiter (no external dep needed) ─────────────────
 // Stores { count, resetAt } per IP address
@@ -18,6 +19,14 @@ function getClientIp(req: NextRequest): string {
 
 function checkRateLimit(ip: string): { allowed: boolean; retryAfterSeconds: number } {
   const now = Date.now();
+
+  // Abgelaufene Einträge gelegentlich entfernen, damit die Map nicht wächst.
+  if (rateLimitMap.size > 1000) {
+    for (const [key, value] of rateLimitMap) {
+      if (now > value.resetAt) rateLimitMap.delete(key);
+    }
+  }
+
   const entry = rateLimitMap.get(ip);
 
   if (!entry || now > entry.resetAt) {
@@ -36,16 +45,10 @@ function checkRateLimit(ip: string): { allowed: boolean; retryAfterSeconds: numb
 
 // ─── SEC-04: Email validation regex ──────────────────────────────────────────
 const EMAIL_REGEX = /^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$/;
+const ALLOWED_CURRENCIES = ["EUR"];
 
 function isValidEmail(email: string): boolean {
   return EMAIL_REGEX.test(email.trim());
-}
-
-function isValidPassword(password: string): { valid: boolean; reason?: string } {
-  if (password.length < 8) return { valid: false, reason: "Mindestens 8 Zeichen erforderlich." };
-  if (!/[A-Z]/.test(password)) return { valid: false, reason: "Mindestens ein Großbuchstabe erforderlich." };
-  if (!/[0-9]/.test(password)) return { valid: false, reason: "Mindestens eine Zahl erforderlich." };
-  return { valid: true };
 }
 
 // ─── Route Handler ────────────────────────────────────────────────────────────
@@ -53,8 +56,35 @@ export async function POST(req: NextRequest) {
   // SEC-06: CSRF Origin check
   const origin = req.headers.get("origin");
   const host = req.headers.get("host");
-  if (origin && host && !origin.includes(host)) {
-    return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 403 });
+  if (origin && host) {
+    try {
+      if (new URL(origin).host !== host) {
+        return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 403 });
+      }
+    } catch {
+      return NextResponse.json({ error: "Ungültige Anfrage." }, { status: 403 });
+    }
+  }
+
+  // Registrierung ist nach dem ersten Konto standardmäßig geschlossen.
+  // Für weitere Konten muss ALLOW_REGISTRATION=true gesetzt sein.
+  try {
+    const userCount = await db.user.count();
+    if (userCount > 0 && process.env.ALLOW_REGISTRATION !== "true") {
+      return NextResponse.json(
+        {
+          error:
+            "Die Registrierung ist deaktiviert. Bitte wende dich an den Administrator.",
+        },
+        { status: 403 }
+      );
+    }
+  } catch (error) {
+    console.error("Registrierungsprüfung fehlgeschlagen:", error);
+    return NextResponse.json(
+      { error: "Ein interner Fehler ist aufgetreten." },
+      { status: 500 }
+    );
   }
 
   // SEC-03: Rate limiting
@@ -76,6 +106,11 @@ export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { name, email, password, currency } = body;
+
+    const userCurrency =
+      typeof currency === "string" && ALLOWED_CURRENCIES.includes(currency)
+        ? currency
+        : "EUR";
 
     // Input presence check
     if (!name?.trim() || !email?.trim() || !password) {
@@ -120,7 +155,7 @@ export async function POST(req: NextRequest) {
         name: name.trim(),
         email: email.trim().toLowerCase(),
         password: hashedPassword,
-        currency: currency || "EUR",
+        currency: userCurrency,
         portfolios: {
           create: {
             name: "Mein Portfolio",

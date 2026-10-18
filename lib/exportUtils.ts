@@ -7,6 +7,21 @@
  * CSV/JSON-Strategie: data: URI mit echtem Download-Attribut
  */
 
+/**
+ * HTML-Escaping für alle benutzergesteuerten Werte in den Export-Vorlagen.
+ * Die Berichte werden als Blob geöffnet und erben damit die App-Origin.
+ */
+function escapeHtml(value: unknown): string {
+  const replacements: Record<string, string> = {
+    "&": "&amp;",
+    "<": "&lt;",
+    ">": "&gt;",
+    '"': "&quot;",
+    "'": "&#39;",
+  };
+  return String(value ?? "").replace(/[&<>"']/g, (char) => replacements[char]);
+}
+
 // ─── CSV ───────────────────────────────────────────────────────────────────
 
 export function downloadCSV(rows: Record<string, unknown>[], filename: string) {
@@ -14,7 +29,9 @@ export function downloadCSV(rows: Record<string, unknown>[], filename: string) {
 
   const keys = Object.keys(rows[0]);
   const escape = (v: unknown) => {
-    const s = String(v ?? "");
+    let s = String(v ?? "");
+    // Formel-Injection in Excel/LibreOffice neutralisieren.
+    if (/^[=+\-@\t\r]/.test(s)) s = `'${s}`;
     return /[,"\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
 
@@ -63,7 +80,7 @@ export function generateTaxPDF(params: {
       <tr>
         <td>${fmtDate(e.buyDate)}</td>
         <td>${fmtDate(e.sellDate)}</td>
-        <td><strong>${e.asset}</strong></td>
+        <td><strong>${escapeHtml(e.asset)}</strong></td>
         <td><span class="badge ${isLong ? "badge-green" : "badge-gold"}">${e.holdingDays} Tage</span></td>
         <td class="mono">${fmt(e.costBasis)}</td>
         <td class="mono primary">${fmt(e.proceeds)}</td>
@@ -171,7 +188,7 @@ export function generateTaxPDF(params: {
     </div>
     <div>
       <div class="report-title">Steuerbericht ${year} &mdash; ${method}-Methode</div>
-      <div class="report-meta">Erstellt: ${now}${params.userName ? " &bull; Nutzer: " + params.userName : ""}</div>
+      <div class="report-meta">Erstellt: ${now}${params.userName ? " &bull; Nutzer: " + escapeHtml(params.userName) : ""}</div>
     </div>
   </div>
 
@@ -267,12 +284,12 @@ export function generateTradesPDF(params: {
         <td>${d.toLocaleDateString("de-DE")}</td>
         <td class="mono" style="color:#6b7280;font-size:10px">${d.toLocaleTimeString("de-DE",{hour:"2-digit",minute:"2-digit"})}</td>
         <td><span class="badge badge-${typ.cls}">${typ.label}</span></td>
-        <td><strong>${t.asset}</strong></td>
+        <td><strong>${escapeHtml(t.asset)}</strong></td>
         <td class="mono">${t.amount.toFixed(6)}</td>
         <td class="mono">${fmtNum(t.price)} €</td>
         <td class="mono primary">${fmtNum(summe)} €</td>
         <td class="mono" style="color:#6b7280">${fmtNum(t.fee)} €</td>
-        <td>${t.exchange}</td>
+        <td>${escapeHtml(t.exchange)}</td>
       </tr>`;
   }).join("");
 
@@ -340,7 +357,7 @@ export function generateTradesPDF(params: {
     </div>
     <div>
       <div class="report-title">Trade-Verlauf &mdash; ${params.trades.length} Transaktionen</div>
-      <div class="report-meta">Erstellt: ${now}${params.userName ? " &bull; " + params.userName : ""}</div>
+      <div class="report-meta">Erstellt: ${now}${params.userName ? " &bull; " + escapeHtml(params.userName) : ""}</div>
     </div>
   </div>
   <div class="stats">

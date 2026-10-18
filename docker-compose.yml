@@ -16,6 +16,9 @@ services:
       NEXTAUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET muss in .env gesetzt sein}
       AUTH_TRUST_HOST: "true"
       DATABASE_URL: file:/data/cryptotracker.db
+      # Admin-Freigabe für System-Endpunkte; ohne Eintrag gesperrt.
+      ADMIN_EMAILS: ${ADMIN_EMAILS:-}
+      ALLOW_REGISTRATION: ${ALLOW_REGISTRATION:-false}
       # Optional: Selbst-Update ueber einen Host-Agenten. Siehe
       # docs/System-Updates-und-Branch-Wechsel.md. Ohne die beiden Mounts
       # bleibt das Panel im Container ehrlich deaktiviert.
@@ -27,6 +30,20 @@ services:
       - cryptotracker_data:/data
       # - /pfad/zum/quellklon:/repo:ro
       # - /pfad/zum/update-verzeichnis:/update
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        - "CMD"
+        - "node"
+        - "-e"
+        - "fetch('http://127.0.0.1:3000/anmelden').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
 
 volumes:
   cryptotracker_data:

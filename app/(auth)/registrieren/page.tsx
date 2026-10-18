@@ -8,13 +8,9 @@ import {
   TrendingUp, Mail, Lock, User, AlertCircle, Loader2, CheckCircle,
 } from "lucide-react";
 
-const WAEHRUNGEN = [
-  { code: "EUR", name: "Euro (€)" },
-  { code: "USD", name: "US-Dollar ($)" },
-  { code: "CHF", name: "Schweizer Franken (CHF)" },
-  { code: "GBP", name: "Britisches Pfund (£)" },
-  { code: "JPY", name: "Japanischer Yen (¥)" },
-];
+// Kurse werden ausschliesslich in EUR gefuehrt; andere Waehrungen
+// wuerden nur das Symbol tauschen und falsche Werte zeigen.
+const WAEHRUNGEN = [{ code: "EUR", name: "Euro (€)" }];
 
 export default function RegistrierenPage() {
   const router = useRouter();

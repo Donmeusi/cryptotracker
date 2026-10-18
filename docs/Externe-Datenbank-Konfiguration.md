@@ -1,6 +1,13 @@
 # Externe Datenbank-Konfiguration (PostgreSQL, MySQL, SQLite)
 
-CryptoTracker erlaubt es, externe Datenbank-Server direkt über die Benutzeroberfläche anzubinden.
+> **Wichtig (Oktober 2026): PostgreSQL und MySQL werden derzeit nicht unterstützt.**
+> Das Prisma-Schema ist fest auf `provider = "sqlite"` eingestellt. Die API lehnt
+> andere Datenbanktypen mit einer Fehlermeldung ab. Die Oberfläche erlaubt nur
+> noch SQLite; die frühere Auswahl war eine Attrappe. Ein Wechsel auf einen
+> Server-Datenbanktyp würde eine Schema-Migration und einen zweiten Provider
+> erfordern.
+
+CryptoTracker erlaubt es, die SQLite-Datei über die Benutzeroberfläche zu ändern.
 
 ---
 

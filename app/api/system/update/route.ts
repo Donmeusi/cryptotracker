@@ -1,11 +1,11 @@
 import { NextResponse } from "next/server";
-import { exec } from "child_process";
+import { execFile } from "child_process";
 import { promisify } from "util";
 import { promises as fs } from "fs";
 import path from "path";
-import { auth } from "@/lib/auth";
+import { adminErrorResponse, getAdminSession } from "@/lib/authz";
 
-const execAsync = promisify(exec);
+const execFileAsync = promisify(execFile);
 
 const CONTAINER_MODE = process.env.CONTAINER_MODE === "true";
 const REPO_DIR = process.env.REPO_DIR || "/repo";
@@ -37,34 +37,27 @@ async function readGitInfo(
     return { branch: "unknown", commit: "unknown" };
   }
 
-  // Detached HEAD: HEAD enthält direkt den Commit.
   if (!head.startsWith("ref:")) {
     return { branch: "detached", commit: head.slice(0, 7) };
   }
 
-  const ref = head.slice(4).trim(); // z. B. refs/heads/beta
+  const ref = head.slice(4).trim();
   const branch = ref.replace(/^refs\/heads\//, "") || "unknown";
 
   let commit = "";
   try {
     commit = (await fs.readFile(path.join(gitDir, ref), "utf8")).trim();
   } catch {
-    // Nach `git pack-refs` liegt der Ref in packed-refs.
     try {
       const packed = await fs.readFile(path.join(gitDir, "packed-refs"), "utf8");
-      const line = packed
-        .split("\n")
-        .find((entry) => entry.endsWith(` ${ref}`));
+      const line = packed.split("\n").find((entry) => entry.endsWith(` ${ref}`));
       if (line) commit = line.split(" ")[0].trim();
     } catch {
       commit = "";
     }
   }
 
-  return {
-    branch,
-    commit: commit ? commit.slice(0, 7) : "unknown",
-  };
+  return { branch, commit: commit ? commit.slice(0, 7) : "unknown" };
 }
 
 type UpdateStatus = {
@@ -115,12 +108,14 @@ async function fetchRemoteCommit(branch: string): Promise<string | null> {
   }
 }
 
-// ─── GET: Versionsstand / Status ─────────────────────────────────────────────
+// ─── GET: Versionsstand / Status (nur Admin) ────────────────────────────────
 
 export async function GET() {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (admin.status !== 200) {
+    return NextResponse.json(adminErrorResponse(admin.status), {
+      status: admin.status,
+    });
   }
 
   if (CONTAINER_MODE) {
@@ -149,32 +144,28 @@ export async function GET() {
 
     let currentBranch = "main";
     try {
-      const { stdout } = await execAsync("git branch --show-current", { cwd });
+      const { stdout } = await execFileAsync("git", ["branch", "--show-current"], { cwd });
       currentBranch = stdout.trim() || "main";
     } catch (e) {
       console.warn("Could not get current git branch", e);
     }
 
-    let localCommit = "v0.3.0";
+    let localCommit = "unbekannt";
     try {
-      const { stdout } = await execAsync("git rev-parse --short HEAD", { cwd });
-      localCommit = stdout.trim() || "v0.3.0";
+      const { stdout } = await execFileAsync("git", ["rev-parse", "--short", "HEAD"], { cwd });
+      localCommit = stdout.trim() || "unbekannt";
     } catch (e) {
       console.warn("Could not get local commit", e);
-    }
-
-    let remoteUrl = "https://github.com/Donmeusi/cryptotracker.git";
-    try {
-      const { stdout } = await execAsync("git remote get-url origin", { cwd });
-      remoteUrl = stdout.trim() || remoteUrl;
-    } catch (e) {
-      console.warn("Could not get remote url", e);
     }
 
     let remoteCommit = localCommit;
     let updatesAvailable = false;
     try {
-      const { stdout } = await execAsync(`git ls-remote origin ${currentBranch}`, { cwd });
+      const { stdout } = await execFileAsync(
+        "git",
+        ["ls-remote", "origin", currentBranch],
+        { cwd }
+      );
       const parts = stdout.trim().split(/\s+/);
       if (parts[0]) {
         remoteCommit = parts[0].slice(0, 7);
@@ -190,24 +181,26 @@ export async function GET() {
       currentBranch,
       localCommit,
       remoteCommit,
-      remoteUrl,
+      repoUrl: `https://github.com/${UPDATE_REPO}`,
       updatesAvailable,
     });
   } catch (error: unknown) {
     console.error("System update GET error:", error);
     return NextResponse.json(
-      { error: getErrorMessage(error) || "Failed to check version" },
+      { error: "Versionsstand konnte nicht gelesen werden." },
       { status: 500 }
     );
   }
 }
 
-// ─── POST: Update anfordern bzw. ausführen ───────────────────────────────────
+// ─── POST: Update anfordern bzw. ausführen (nur Admin) ──────────────────────
 
 export async function POST(req: Request) {
-  const session = await auth();
-  if (!session?.user?.id) {
-    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  const admin = await getAdminSession();
+  if (admin.status !== 200) {
+    return NextResponse.json(adminErrorResponse(admin.status), {
+      status: admin.status,
+    });
   }
 
   if (CONTAINER_MODE) {
@@ -233,7 +226,7 @@ export async function POST(req: Request) {
         JSON.stringify({
           targetBranch,
           requestedAt: new Date().toISOString(),
-          requestedBy: session.user.email || session.user.id,
+          requestedBy: admin.user.email,
         }),
         "utf8"
       );
@@ -265,6 +258,8 @@ export async function POST(req: Request) {
     }
   }
 
+  // Nativer Modus: feste Argumente statt Shell-Strings, keine frei wählbare
+  // Remote-URL mehr.
   try {
     const body = await req.json();
     const targetBranch = body.targetBranch || "beta";
@@ -274,91 +269,63 @@ export async function POST(req: Request) {
         { status: 400 }
       );
     }
-    const repoUrl = typeof body.repoUrl === "string" ? body.repoUrl.trim() : "";
+
     const cwd = process.cwd();
     const logs: string[] = [];
+    let failed = false;
 
-    // 1. Update Remote URL if provided
-    if (repoUrl) {
+    async function run(
+      command: string,
+      args: string[],
+      timeout?: number
+    ): Promise<boolean> {
       try {
-        await execAsync(`git remote set-url origin ${repoUrl}`, { cwd });
-        logs.push(`Remote-URL auf ${repoUrl} gesetzt.`);
-      } catch {
-        try {
-          await execAsync(`git remote add origin ${repoUrl}`, { cwd });
-          logs.push(`Remote origin hinzugefügt: ${repoUrl}`);
-        } catch (err: unknown) {
-          logs.push(`Remote-URL Hinweis: ${getErrorMessage(err)}`);
-        }
+        const { stdout, stderr } = await execFileAsync(command, args, {
+          cwd,
+          timeout: timeout ?? 120000,
+          maxBuffer: 4 * 1024 * 1024,
+        });
+        if (stdout?.trim()) logs.push(stdout.trim().slice(0, 4000));
+        if (stderr?.trim()) logs.push(stderr.trim().slice(0, 4000));
+        return true;
+      } catch (error: unknown) {
+        failed = true;
+        logs.push(`Fehler bei ${command} ${args.join(" ")}: ${getErrorMessage(error)}`);
+        return false;
       }
     }
 
-    // 2. Git Fetch
-    try {
-      const { stdout } = await execAsync("git fetch origin", { cwd });
-      logs.push("Git fetch origin erfolgreich ausgeführt.");
-      if (stdout.trim()) logs.push(stdout.trim());
-    } catch (e: unknown) {
-      logs.push(`Git fetch Warnung: ${getErrorMessage(e)}`);
+    if (!(await run("git", ["fetch", "origin"]))) {
+      return NextResponse.json(
+        { success: false, mode: "native", logs },
+        { status: 500 }
+      );
     }
 
-    // 3. Git Checkout target branch
-    try {
-      const { stdout, stderr } = await execAsync(`git checkout ${targetBranch}`, { cwd });
-      logs.push(`Erfolgreich auf Branch '${targetBranch}' gewechselt.`);
-      if (stdout.trim()) logs.push(stdout.trim());
-      if (stderr.trim()) logs.push(stderr.trim());
-    } catch {
-      try {
-        await execAsync(`git checkout -b ${targetBranch} origin/${targetBranch}`, { cwd });
-        logs.push(`Branch '${targetBranch}' neu von origin/${targetBranch} ausgecheckt.`);
-      } catch (err: unknown) {
-        logs.push(`Checkout Fehler: ${getErrorMessage(err)}`);
-      }
+    if (!(await run("git", ["checkout", targetBranch]))) {
+      await run("git", ["checkout", "-b", targetBranch, `origin/${targetBranch}`]);
+    }
+    await run("git", ["pull", "--ff-only", "origin", targetBranch]);
+
+    await run("npm", ["install"], 600000);
+    await run("npx", ["prisma", "generate"], 300000);
+    await run("npx", ["prisma", "db", "push", "--skip-generate"], 300000);
+    const buildOk = await run("npm", ["run", "build"], 600000);
+
+    if (buildOk) {
+      logs.push("Build abgeschlossen. App neu starten, damit der Build aktiv wird.");
     }
 
-    // 4. Git Pull
+    let updatedCommit = "unbekannt";
     try {
-      const { stdout } = await execAsync(`git pull origin ${targetBranch}`, { cwd });
-      logs.push(`Git pull origin ${targetBranch} erfolgreich.`);
-      if (stdout.trim()) logs.push(stdout.trim());
-    } catch (e: unknown) {
-      logs.push(`Git pull Hinweis: ${getErrorMessage(e)}`);
-    }
-
-    // 5. Dependencies, Build & Datenbank
-    try {
-      await execAsync("npm install", { cwd });
-      logs.push("Abhängigkeiten installiert.");
-    } catch (e: unknown) {
-      logs.push(`npm install Hinweis: ${getErrorMessage(e)}`);
-    }
-    try {
-      await execAsync("npx prisma db push --skip-generate", { cwd });
-      logs.push("Datenbank-Schema synchronisiert.");
-      await execAsync("npx prisma generate", { cwd });
-      logs.push("Prisma Client neu generiert.");
-    } catch (e: unknown) {
-      logs.push(`Prisma Sync Hinweis: ${getErrorMessage(e)}`);
-    }
-    try {
-      await execAsync("npm run build", { cwd, timeout: 600000 });
-      logs.push("Produktions-Build abgeschlossen. App neu starten, damit der Build aktiv wird.");
-    } catch (e: unknown) {
-      logs.push(`Build Hinweis: ${getErrorMessage(e)}`);
-    }
-
-    // 6. Get updated commit info
-    let updatedCommit = "v0.3.0";
-    try {
-      const { stdout } = await execAsync("git rev-parse --short HEAD", { cwd });
+      const { stdout } = await execFileAsync("git", ["rev-parse", "--short", "HEAD"], { cwd });
       updatedCommit = stdout.trim();
     } catch {
       // ignore
     }
 
     return NextResponse.json({
-      success: true,
+      success: !failed,
       mode: "native",
       currentBranch: targetBranch,
       updatedCommit,
@@ -367,7 +334,7 @@ export async function POST(req: Request) {
   } catch (error: unknown) {
     console.error("System update POST error:", error);
     return NextResponse.json(
-      { error: getErrorMessage(error) || "Update execution failed" },
+      { error: "Update konnte nicht ausgeführt werden." },
       { status: 500 }
     );
   }

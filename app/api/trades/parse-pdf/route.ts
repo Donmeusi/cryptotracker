@@ -1,6 +1,29 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 
 export const dynamic = "force-dynamic";
+
+const MAX_PDF_BYTES = 10 * 1024 * 1024; // 10 MB
+const MAX_UPLOADS = 10;
+const UPLOAD_WINDOW_MS = 10 * 60 * 1000;
+const uploads = new Map<string, { count: number; resetAt: number }>();
+
+function allowUpload(userId: string): boolean {
+  const now = Date.now();
+  if (uploads.size > 500) {
+    for (const [key, value] of uploads) {
+      if (now > value.resetAt) uploads.delete(key);
+    }
+  }
+  const entry = uploads.get(userId);
+  if (!entry || now > entry.resetAt) {
+    uploads.set(userId, { count: 1, resetAt: now + UPLOAD_WINDOW_MS });
+    return true;
+  }
+  if (entry.count >= MAX_UPLOADS) return false;
+  entry.count += 1;
+  return true;
+}
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const pdfParse = require("pdf-parse/lib/pdf-parse.js");
 
@@ -29,6 +52,17 @@ const KNOWN_EXCHANGES = [
 ];
 
 export async function POST(req: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  }
+  if (!allowUpload(session.user.id)) {
+    return NextResponse.json(
+      { error: "Zu viele Uploads. Bitte versuche es in einigen Minuten erneut." },
+      { status: 429 }
+    );
+  }
+
   const contentType = req.headers.get("content-type") || "";
   if (!contentType.includes("multipart/form-data")) {
     return NextResponse.json(
@@ -49,17 +83,32 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Nur PDF-Dateien werden unterstützt (.pdf)" }, { status: 400 });
     }
 
+    if (file.size > MAX_PDF_BYTES) {
+      return NextResponse.json(
+        { error: "Die Datei ist zu groß (maximal 10 MB)." },
+        { status: 413 }
+      );
+    }
+
     const arrayBuffer = await file.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
+
+    // Magic-Bytes prüfen: eine umbenannte Datei ist kein PDF.
+    if (buffer.subarray(0, 5).toString("latin1") !== "%PDF-") {
+      return NextResponse.json(
+        { error: "Die Datei ist kein gültiges PDF." },
+        { status: 400 }
+      );
+    }
 
     // PDF Text extrahieren
     let pdfData: { text?: string; numpages?: number } = {};
     try {
       pdfData = await pdfParse(buffer);
     } catch (parseErr: unknown) {
-      const msg = parseErr instanceof Error ? parseErr.message : "PDF beschädigt oder nicht lesbar";
+      console.error("PDF konnte nicht gelesen werden:", parseErr);
       return NextResponse.json(
-        { error: `Die PDF-Datei konnte nicht gelesen werden (${msg}). Bitte prüfe, ob die Datei geschützt ist.` },
+        { error: "Die PDF-Datei konnte nicht gelesen werden. Bitte prüfe, ob sie beschädigt oder geschützt ist." },
         { status: 400 }
       );
     }
@@ -83,11 +132,23 @@ export async function POST(req: NextRequest) {
     });
   } catch (error: unknown) {
     console.error("PDF Parsing Error:", error);
-    const errMsg = error instanceof Error ? error.message : "Unbekannter Fehler";
-    return NextResponse.json({
-      error: `Fehler beim Verarbeiten der PDF-Datei: ${errMsg}`
-    }, { status: 400 });
+    return NextResponse.json(
+      { error: "Fehler beim Verarbeiten der PDF-Datei." },
+      { status: 500 }
+    );
   }
+}
+
+function parseLocaleNumber(raw: string): number {
+  const cleaned = raw.replace(/[^\d.,-]/g, "");
+  const lastComma = cleaned.lastIndexOf(",");
+  const lastDot = cleaned.lastIndexOf(".");
+  if (lastComma > lastDot) {
+    // Deutsches Format: 1.234,56
+    return Number(cleaned.replace(/\./g, "").replace(",", "."));
+  }
+  // Englisches Format: 1,234.56
+  return Number(cleaned.replace(/,/g, ""));
 }
 
 function parsePdfTextToTrades(text: string, filename: string): ParsedTrade[] {
@@ -118,8 +179,9 @@ function parsePdfTextToTrades(text: string, filename: string): ParsedTrade[] {
     tradeType = "BUY";
   }
 
-  // 3. Erkennung des Assets
-  let detectedAsset = "BTC"; // Default fallback
+  // 3. Erkennung des Assets. Kein BTC-Fallback mehr - ein nicht erkanntes
+  // Asset bleibt leer und muss im Vorschau-Dialog ergänzt werden.
+  let detectedAsset = "";
   for (const asset of SUPPORTED_ASSETS) {
     const symbolRegex = new RegExp(`\\b${asset}\\b`, "i");
     if (symbolRegex.test(cleanText)) {
@@ -149,8 +211,7 @@ function parsePdfTextToTrades(text: string, filename: string): ParsedTrade[] {
   const amountMatches = cleanText.match(/(?:stk\.|menge|anzahl|amount|quantity|volumen)?[:\s]*(\d+[\.,]\d{2,8})\b/gi);
   if (amountMatches) {
     for (const raw of amountMatches) {
-      const numStr = raw.replace(/[^\d,\.]/g, "").replace(",", ".");
-      const val = parseFloat(numStr);
+      const val = parseLocaleNumber(raw);
       if (val > 0 && val < 1000000) {
         amount = val;
         break;
@@ -163,8 +224,7 @@ function parsePdfTextToTrades(text: string, filename: string): ParsedTrade[] {
   // Matches e.g. "Kurs: 85.000,00 EUR" or "Preis 3.200,50" or "85000 EUR"
   const priceMatch = cleanText.match(/(?:kurs|preis|price|rate|betrag|wert)[:\s]*([\d\.\,]+)\s*(?:eur|usd|€|\$)?/i);
   if (priceMatch && priceMatch[1]) {
-    const numStr = priceMatch[1].replace(/\./g, "").replace(",", ".");
-    const val = parseFloat(numStr);
+    const val = parseLocaleNumber(priceMatch[1]);
     if (val > 0) price = val;
   }
 
@@ -172,8 +232,7 @@ function parsePdfTextToTrades(text: string, filename: string): ParsedTrade[] {
   let fee = 0;
   const feeMatch = cleanText.match(/(?:gebühr|fee|fremdspesen|kosten)[:\s]*([\d\.\,]+)\s*(?:eur|usd|€|\$)?/i);
   if (feeMatch && feeMatch[1]) {
-    const numStr = feeMatch[1].replace(/\./g, "").replace(",", ".");
-    const val = parseFloat(numStr);
+    const val = parseLocaleNumber(feeMatch[1]);
     if (val >= 0 && val < 1000) fee = val;
   }
 
@@ -183,16 +242,23 @@ function parsePdfTextToTrades(text: string, filename: string): ParsedTrade[] {
   if (amount > 0) confidence += 20;
   if (price > 0) confidence += 15;
 
+  // Ohne Menge und Kurs wird kein Trade erzeugt. Früher wurden hier
+  // Fantasiewerte (1 Stück / 100 €) eingetragen - die hätten die Position
+  // verfälscht.
+  if (amount <= 0 || price <= 0) {
+    return [];
+  }
+
   trades.push({
     id: `pdf-${Date.now()}-1`,
     asset: detectedAsset,
     type: tradeType,
-    amount: amount || 1,
-    price: price || 100,
-    fee: fee,
+    amount,
+    price,
+    fee,
     feeCurrency: "EUR",
-    exchange: detectedExchange === "Unbekannt" ? "Binance" : detectedExchange,
-    executedAt: executedAt,
+    exchange: detectedExchange === "Unbekannt" ? "" : detectedExchange,
+    executedAt,
     notes: `Importiert aus PDF Beleg (${filename})`,
     confidence: Math.min(confidence, 100)
   });

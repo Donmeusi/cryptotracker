@@ -47,6 +47,7 @@ model Account {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([provider, providerAccountId])
+  @@index([userId])
 }
 
 model Session {
@@ -55,6 +56,8 @@ model Session {
   userId       String
   expires      DateTime
   user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
 }
 
 model VerificationToken {
@@ -140,6 +143,9 @@ model Trade {
   asset      Asset       @relation(fields: [assetId], references: [id])
   exchange   Exchange?   @relation(fields: [exchangeId], references: [id])
   taxEvents  TaxEvent[]
+
+  @@index([portfolioId, executedAt])
+  @@index([assetId])
 }
 
 enum TradeType {
@@ -167,6 +173,8 @@ model Exchange {
   createdAt   DateTime     @default(now())
 
   trades Trade[]
+
+  @@index([name])
 }
 
 enum ExchangeType {
