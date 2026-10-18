@@ -26,6 +26,10 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) 
 - Währungen: nur EUR (Kurse werden nicht umgerechnet), Formatierung crasht nicht bei ungültigem Code.
 - Schema: Indizes auf `Trade(portfolioId, executedAt)`, `Trade(assetId)`, `Account.userId`, `Session.userId`, `Exchange.name`.
 
+### Host-unabhängige Installation
+- `AUTH_URL` ist optional: Middleware, Seiten-Redirects und Logout leiten die öffentliche Origin aus `Host`/`X-Forwarded-Proto` ab. Die Instanz läuft damit hinter jedem Reverse Proxy und direkt per IP ohne `.env`-Anpassung.
+- OIDC/SSO benötigt weiterhin eine feste `AUTH_URL` (Redirect-URI).
+
 ### Betrieb
 - Backup-Skript für Unraid (SQLite + Compose + db-config, AES-256, täglich 03:45). Es sichert jetzt auch Update-Agent, Backup-Skript und Cron-Dateien von `/boot`.
 - Host-Skripte als Referenz im Repo unter `ops/unraid/`.

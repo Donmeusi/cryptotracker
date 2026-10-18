@@ -7,9 +7,11 @@ services:
       - "3000:3000"
     environment:
       NODE_ENV: production
-      # Oeffentliche URL: fuer LAN die Host-IP, hinter einem Proxy die Domain.
-      AUTH_URL: ${AUTH_URL:-http://localhost:3000}
-      NEXTAUTH_URL: ${AUTH_URL:-http://localhost:3000}
+      # Optional: feste oeffentliche URL (z. B. https://crypto.example.de).
+      # Leer lassen, damit die App die Origin aus den Proxy-Headern
+      # (Host / X-Forwarded-Proto) ableitet. Fuer OIDC ist AUTH_URL Pflicht.
+      AUTH_URL: ${AUTH_URL:-}
+      NEXTAUTH_URL: ${AUTH_URL:-}
       # Pflicht. Kein Standardwert im Repo - sonst signiert jeder Container
       # mit demselben Schluessel.
       AUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET muss in .env gesetzt sein}

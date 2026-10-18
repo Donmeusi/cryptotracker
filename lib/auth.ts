@@ -69,6 +69,9 @@ const DUMMY_HASH = bcrypt.hashSync("cryptotracker-dummy-password", 12);
 
 export const { handlers, auth, signIn, signOut } = NextAuth({
   adapter: PrismaAdapter(db),
+  // Öffentliche URL aus den Proxy-Headern (Host/X-Forwarded-*) ableiten,
+  // damit keine host-spezifische AUTH_URL gepflegt werden muss.
+  trustHost: true,
   session: { strategy: "jwt", maxAge: 60 * 60 * 24 * 7 },
   pages: {
     signIn: "/anmelden",

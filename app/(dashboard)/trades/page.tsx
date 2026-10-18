@@ -1,4 +1,5 @@
 import { redirect } from "next/navigation";
+import { publicLoginUrl } from "@/lib/serverUrl";
 import type { Metadata } from "next";
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
@@ -10,12 +11,12 @@ export const dynamic = "force-dynamic";
 
 export default async function TradesPage() {
   const session = await auth();
-  if (!session?.user?.id) redirect("/anmelden");
+  if (!session?.user?.id) redirect(await publicLoginUrl());
 
   const currency =
     (session.user as { currency?: string }).currency || "EUR";
   const portfolio = await getOrCreatePortfolio(session.user.id);
-  if (!portfolio) redirect("/anmelden");
+  if (!portfolio) redirect(await publicLoginUrl());
   const trades = await db.trade.findMany({
     where: { portfolioId: portfolio.id },
     include: { asset: true, exchange: true },

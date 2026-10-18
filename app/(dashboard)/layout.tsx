@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { redirect } from "next/navigation";
+import { publicLoginUrl } from "@/lib/serverUrl";
 import Sidebar from "@/components/sidebar/Sidebar";
 
 export default async function DashboardLayout({
@@ -8,7 +9,7 @@ export default async function DashboardLayout({
   children: React.ReactNode;
 }) {
   const session = await auth();
-  if (!session) redirect("/anmelden");
+  if (!session) redirect(await publicLoginUrl());
 
   return (
     <div className="app-layout">

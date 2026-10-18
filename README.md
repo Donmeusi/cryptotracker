@@ -4,6 +4,8 @@
 
 Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wallets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM, NextAuth.js v5 und Recharts — mit einem hochwertigen Dark/Light-Mode-UI, Docker-Unterstützung und Live-Preisen.
 
+> **Host-unabhängige Installation:** `AUTH_URL` ist optional. Bleibt sie leer, leitet die App die öffentliche Origin aus den Proxy-Headern (`Host`, `X-Forwarded-Proto`) ab — die Instanz funktioniert dann hinter jedem Reverse Proxy und direkt per IP ohne `.env`-Anpassung. Für OIDC/SSO muss `AUTH_URL` gesetzt sein.
+>
 > **Sicherheit (Oktober 2026):** Systemfunktionen (Update, DB-Konfiguration, OIDC) sind auf `ADMIN_EMAILS` beschränkt. Die Registrierung ist nach dem ersten Konto geschlossen (`ALLOW_REGISTRATION`). OIDC wird über Umgebungsvariablen konfiguriert. Für den Internetbetrieb ist ein HTTPS-Reverse-Proxy erforderlich; die App terminiert selbst kein TLS.
 >
 > **Projektstatus (Oktober 2026): Kernmodule sind datenbankgestützt.**

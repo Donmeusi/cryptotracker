@@ -1639,7 +1639,8 @@ export default function EinstellungenPage() {
       return;
     }
 
-    await signOut({ callbackUrl: "/anmelden" });
+    await signOut({ redirect: false });
+    window.location.href = "/anmelden";
   }
 
   return (
