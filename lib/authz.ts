@@ -1,5 +1,6 @@
 import { auth } from "@/lib/auth";
 import { db } from "@/lib/db";
+import { isAdminEmail } from "@/lib/admin";
 
 // Zentrale Admin-Prüfung für System-Endpunkte (Update, DB-Konfiguration, OIDC).
 // Die Freigabe erfolgt über ADMIN_EMAILS (kommagetrennt). Ist die Variable
@@ -15,17 +16,7 @@ export type AdminCheck =
   | { status: 401 }
   | { status: 403 };
 
-export function adminEmails(): string[] {
-  return (process.env.ADMIN_EMAILS || "")
-    .split(",")
-    .map((entry) => entry.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-export function isAdminEmail(email?: string | null): boolean {
-  if (!email) return false;
-  return adminEmails().includes(email.toLowerCase());
-}
+export { adminEmails, isAdminEmail } from "@/lib/admin";
 
 /**
  * Prüft Sitzung, Admin-Freigabe und ob der Benutzer noch existiert.

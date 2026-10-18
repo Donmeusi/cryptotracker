@@ -3,6 +3,7 @@ import { PrismaAdapter } from "@auth/prisma-adapter";
 import Credentials from "next-auth/providers/credentials";
 import bcrypt from "bcryptjs";
 import { db } from "@/lib/db";
+import { isAdminEmail } from "@/lib/admin";
 
 // Helper to get active OIDC config from DB or env
 export async function getOidcConfig() {
@@ -183,8 +184,16 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     async session({ session, token }) {
       if (token && session.user) {
         session.user.id = token.id as string;
-        (session.user as { currency?: string }).currency =
-          token.currency as string;
+        const user = session.user as {
+          currency?: string;
+          isAdmin?: boolean;
+        };
+        user.currency = token.currency as string;
+        // Admin-Status bei jedem Session-Zugriff aus der aktuellen
+        // ADMIN_EMAILS-Liste ableiten (nicht im Token einfrieren).
+        user.isAdmin = isAdminEmail(
+          typeof token.email === "string" ? token.email : null
+        );
       }
       return session;
     },

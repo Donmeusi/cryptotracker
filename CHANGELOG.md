@@ -27,7 +27,9 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) 
 - Schema: Indizes auf `Trade(portfolioId, executedAt)`, `Trade(assetId)`, `Account.userId`, `Session.userId`, `Exchange.name`.
 
 ### Betrieb
-- Backup-Skript für Unraid (SQLite + Compose + db-config, AES-256, täglich 03:45).
+- Backup-Skript für Unraid (SQLite + Compose + db-config, AES-256, täglich 03:45). Es sichert jetzt auch Update-Agent, Backup-Skript und Cron-Dateien von `/boot`.
+- Host-Skripte als Referenz im Repo unter `ops/unraid/`.
+- Einstellungen: „Datenbank & Export“ und „System & Updates“ sind nur für Admins sichtbar.
 
 ### Behoben (Fixed)
 - **Dockerfile war nicht baubar:** `apk add --no-exe` ist keine gültige Option (jetzt `--no-cache`), das vom Runner kopierte `public/` fehlte, und `npm ci` scheiterte am Peer-Konflikt zwischen `next-auth@5.0.0-beta` (`nodemailer ^7`) und `nodemailer@8` (jetzt `--legacy-peer-deps`).

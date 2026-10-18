@@ -1455,13 +1455,23 @@ type ExportTaxEvent = {
 export default function EinstellungenPage() {
   const router = useRouter();
   const { data: session, update } = useSession();
-  const user = session?.user as { name?: string; email?: string; currency?: string } | undefined;
+  const user = session?.user as
+    | { name?: string; email?: string; currency?: string; isAdmin?: boolean }
+    | undefined;
   const currency = user?.currency || "EUR";
+  const isAdmin = Boolean(user?.isAdmin);
 
   const [activeTab, setActiveTab] = useState<Tab>("profil");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
   const [pwStatus, setPwStatus] = useState<"idle" | "saving" | "saved" | "error">("idle");
   const [pwError, setPwError] = useState("");
+
+  // Admin-Tabs für normale Benutzer unzugänglich machen.
+  useEffect(() => {
+    if (!isAdmin && (activeTab === "datenbank" || activeTab === "system")) {
+      setActiveTab("profil");
+    }
+  }, [isAdmin, activeTab]);
 
   async function handleProfileSave() {
     const name = (document.getElementById("s-name") as HTMLInputElement | null)?.value?.trim() ?? "";
@@ -1642,7 +1652,10 @@ export default function EinstellungenPage() {
       <div className="settings-layout">
         {/* Sidebar Navigation */}
         <div className="settings-nav">
-          {NAV_ITEMS.map((item) => (
+          {NAV_ITEMS.filter(
+            (item) =>
+              isAdmin || (item.id !== "datenbank" && item.id !== "system")
+          ).map((item) => (
             <button
               key={item.id}
               id={`settings-tab-${item.id}`}
@@ -1795,7 +1808,7 @@ export default function EinstellungenPage() {
           )}
 
           {/* ─── Datenbank & Export ──────────────────── */}
-          {activeTab === "datenbank" && (
+          {activeTab === "datenbank" && isAdmin && (
             <div className="fade-in" style={{ display: "flex", flexDirection: "column", gap: "var(--space-4)" }}>
               {/* Interactive External DB Config */}
               <DbConfigPanel />
@@ -1873,7 +1886,7 @@ export default function EinstellungenPage() {
           )}
 
           {/* System & Updates Panel */}
-          {activeTab === "system" && (
+          {activeTab === "system" && isAdmin && (
             <div className="card settings-panel fade-in">
               <SystemUpdatePanel />
             </div>
