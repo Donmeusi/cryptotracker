@@ -852,6 +852,11 @@ function SystemUpdatePanel() {
   const [updating, setUpdating] = useState(false);
   const [logs, setLogs] = useState<string[]>([]);
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [containerMode, setContainerMode] = useState(false);
+  const [queued, setQueued] = useState(false);
+  const [updateState, setUpdateState] = useState<
+    "idle" | "queued" | "running" | "done" | "error"
+  >("idle");
 
   const fetchVersionInfo = async () => {
     setLoading(true);
@@ -859,6 +864,7 @@ function SystemUpdatePanel() {
       const res = await fetch("/api/system/update");
       const data = await res.json();
       if (!data.error) {
+        setContainerMode(Boolean(data.container));
         setCurrentBranch(data.currentBranch || "main");
         setTargetBranch(data.currentBranch || "main");
         setLocalCommit(data.localCommit || "v0.3.0");
@@ -876,6 +882,47 @@ function SystemUpdatePanel() {
   useEffect(() => {
     fetchVersionInfo();
   }, []);
+
+  // Im Container übernimmt der Host-Agent den Build. Nach dem Abschluss
+  // schreibt er den Status, den wir hier abholen.
+  useEffect(() => {
+    if (!queued) return;
+    const interval = setInterval(async () => {
+      try {
+        const res = await fetch("/api/system/update");
+        const data = await res.json();
+        const state = data.status?.state as string | undefined;
+        const statusLog =
+          typeof data.status?.log === "string"
+            ? data.status.log.split("\n").filter(Boolean)
+            : [];
+
+        if (state === "running") setUpdateState("running");
+        if (state === "done") {
+          setUpdateState("done");
+          setQueued(false);
+          setLogs((prev) => [
+            ...prev,
+            ...statusLog,
+            `Update abgeschlossen (${data.localCommit}).`,
+          ]);
+          fetchVersionInfo();
+        }
+        if (state === "error") {
+          setUpdateState("error");
+          setQueued(false);
+          setLogs((prev) => [
+            ...prev,
+            ...statusLog,
+            "Update fehlgeschlagen – Details im Log des Host-Agenten.",
+          ]);
+        }
+      } catch {
+        // Während des Neustarts ist die App kurz nicht erreichbar.
+      }
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [queued]);
 
   const handleSaveRepoUrl = () => {
     setSaveStatus("saved");
@@ -898,6 +945,11 @@ function SystemUpdatePanel() {
       if (data.logs) {
         setLogs(data.logs);
       }
+      if (data.queued) {
+        setQueued(true);
+        setUpdateState("queued");
+        return;
+      }
       if (data.success) {
         setCurrentBranch(data.currentBranch);
         setLocalCommit(data.updatedCommit);
@@ -913,6 +965,8 @@ function SystemUpdatePanel() {
 
   return (
     <div>
+      {!containerMode && (
+        <>
       <div style={{ marginBottom: "var(--space-6)" }}>
         <h2 className="settings-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
           <GitBranch size={18} style={{ color: "#F1502F" }} /> Repository-Konfiguration
@@ -951,6 +1005,8 @@ function SystemUpdatePanel() {
       </div>
 
       <div className="divider" />
+        </>
+      )}
 
       <div style={{ marginTop: "var(--space-4)" }}>
         <h2 className="settings-section-title" style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -1050,14 +1106,59 @@ function SystemUpdatePanel() {
           </div>
         )}
 
+        {containerMode && (
+          <div
+            style={{
+              padding: "var(--space-3) var(--space-4)",
+              background: "var(--bg-surface)",
+              border: "1px solid var(--border)",
+              borderRadius: "var(--radius-md)",
+              color: "var(--text-secondary)",
+              fontSize: "var(--text-sm)",
+              marginBottom: "var(--space-4)",
+            }}
+          >
+            <strong>Container-Installation:</strong> Der Update-Auftrag geht an
+            den Host-Agenten. Er holt den gewählten Branch, baut das Image neu
+            und startet den Container. Diese Seite ist währenddessen kurz nicht
+            erreichbar und zeigt danach den neuen Stand.
+          </div>
+        )}
+
+        {updateState === "queued" && (
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-3)" }}>
+            Update angefordert – wartet auf den Host-Agenten (bis zu einer Minute).
+          </div>
+        )}
+        {updateState === "running" && (
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-3)" }}>
+            Host-Agent baut den Container neu. Die App startet gleich neu.
+          </div>
+        )}
+        {updateState === "done" && (
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--green)", marginBottom: "var(--space-3)" }}>
+            <CheckCircle size={14} style={{ display: "inline", marginRight: 6 }} />
+            Update abgeschlossen.
+          </div>
+        )}
+        {updateState === "error" && (
+          <div style={{ fontSize: "var(--text-sm)", color: "var(--red)", marginBottom: "var(--space-3)" }}>
+            Update fehlgeschlagen – bitte das Log des Host-Agenten prüfen.
+          </div>
+        )}
+
         {/* Execute button */}
         <button
           className="btn btn-primary"
           onClick={handleDoUpdate}
-          disabled={updating || loading}
+          disabled={updating || loading || queued}
           style={{ gap: 8 }}
         >
-          {updating ? "Update wird durchgeführt..." : "Update / Kanal-Wechsel durchführen"}
+          {queued
+            ? "Update angefordert..."
+            : updating
+              ? "Update wird durchgeführt..."
+              : "Update / Kanal-Wechsel durchführen"}
         </button>
 
         {/* Log box */}

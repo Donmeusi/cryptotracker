@@ -16,8 +16,17 @@ services:
       NEXTAUTH_SECRET: ${AUTH_SECRET:?AUTH_SECRET muss in .env gesetzt sein}
       AUTH_TRUST_HOST: "true"
       DATABASE_URL: file:/data/cryptotracker.db
+      # Optional: Selbst-Update ueber einen Host-Agenten. Siehe
+      # docs/System-Updates-und-Branch-Wechsel.md. Ohne die beiden Mounts
+      # bleibt das Panel im Container ehrlich deaktiviert.
+      CONTAINER_MODE: ${CONTAINER_MODE:-false}
+      REPO_DIR: ${REPO_DIR:-/repo}
+      UPDATE_DIR: ${UPDATE_DIR:-/update}
+      UPDATE_REPO: ${UPDATE_REPO:-Donmeusi/cryptotracker}
     volumes:
       - cryptotracker_data:/data
+      # - /pfad/zum/quellklon:/repo:ro
+      # - /pfad/zum/update-verzeichnis:/update
 
 volumes:
   cryptotracker_data:
