@@ -7,10 +7,11 @@ import type { HoldingDto } from "@/lib/portfolio";
 import type { PricesMap } from "@/lib/livePrices";
 import { Plus, Search, X, Loader2, AlertCircle, Edit2, Trash2, UploadCloud } from "lucide-react";
 import { useLivePrices } from "@/lib/hooks/useLivePrices";
+import { COIN_SUGGESTIONS } from "@/lib/coinSuggestions";
 import PdfImportModal from "@/components/trades/PdfImportModal";
 import type { ParsedTrade } from "@/app/api/trades/parse-pdf/route";
 
-const TYPE_OPTIONS = ["CRYPTO", "DEFI", "NFT", "STOCK"];
+const TYPE_OPTIONS = ["CRYPTO", "DEFI", "NFT", "STOCK", "FIAT"];
 const TRADE_TYPES = [
   { value: "BUY", label: "Kauf (BUY)" },
   { value: "SELL", label: "Verkauf (SELL)" },
@@ -195,6 +196,7 @@ export default function AssetsClient({
             amount,
             avgBuyPrice: price,
             buyDate: form.buyDate || null,
+            type: form.type,
           }),
         });
         const data = (await res.json()) as { error?: string; holding?: HoldingDto };
@@ -424,18 +426,50 @@ export default function AssetsClient({
               <div className="form-grid-2">
                 <div className="input-group">
                   <label className="label" htmlFor="a-symbol">Symbol / Asset *</label>
-                  <input id="a-symbol" className="input mono" placeholder="z.B. BTC" value={form.symbol} disabled={!!editId} onChange={(e) => { setForm((p) => ({ ...p, symbol: e.target.value })); setFormError(""); }} />
+                  <input
+                    id="a-symbol"
+                    className="input mono"
+                    placeholder="z.B. BTC"
+                    list="coin-suggestions"
+                    autoComplete="off"
+                    value={form.symbol}
+                    disabled={!!editId}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setForm((p) => {
+                        const match = COIN_SUGGESTIONS.find(
+                          (coin) => coin.symbol === value.trim().toUpperCase()
+                        );
+                        // Name nur ergänzen, wenn noch keiner eingetragen ist.
+                        const name = !p.name.trim() && match ? match.name : p.name;
+                        return { ...p, symbol: value, name };
+                      });
+                      setFormError("");
+                    }}
+                  />
+                  <datalist id="coin-suggestions">
+                    {COIN_SUGGESTIONS.map((coin) => (
+                      <option key={coin.symbol} value={coin.symbol}>
+                        {coin.name}
+                      </option>
+                    ))}
+                  </datalist>
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                    Vorschläge erscheinen beim Tippen; andere Symbole sind weiterhin möglich.
+                  </span>
                 </div>
                 <div className="input-group">
                   <label className="label" htmlFor="a-name">Name</label>
                   <input id="a-name" className="input" placeholder="z.B. Bitcoin" value={form.name} onChange={(e) => setForm((p) => ({ ...p, name: e.target.value }))} />
                 </div>
-                <div className="input-group">
-                  <label className="label" htmlFor="a-trade-type">Transaktions-Typ</label>
-                  <select id="a-trade-type" className="input" value={form.tradeType} disabled={!!editId} onChange={(e) => setForm((p) => ({ ...p, tradeType: e.target.value }))}>
-                    {TRADE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
-                  </select>
-                </div>
+                {!editId && (
+                  <div className="input-group">
+                    <label className="label" htmlFor="a-trade-type">Transaktions-Typ</label>
+                    <select id="a-trade-type" className="input" value={form.tradeType} onChange={(e) => setForm((p) => ({ ...p, tradeType: e.target.value }))}>
+                      {TRADE_TYPES.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="input-group">
                   <label className="label" htmlFor="a-amount">Menge / Bestand *</label>
                   <input id="a-amount" type="number" step="any" min="0" className="input mono" placeholder="z.B. 0.5" value={form.amount} onChange={(e) => { setForm((p) => ({ ...p, amount: e.target.value })); setFormError(""); }} />
@@ -451,19 +485,28 @@ export default function AssetsClient({
               </div>
 
               <div className="form-grid-2">
-                <div className="input-group">
-                  <label className="label" htmlFor="a-exchange">Börse / Handelsplatz</label>
-                  <select id="a-exchange" className="input" value={form.exchange} disabled={!!editId} onChange={(e) => setForm((p) => ({ ...p, exchange: e.target.value }))}>
-                    {EXCHANGES.map((ex) => <option key={ex} value={ex}>{ex}</option>)}
-                  </select>
-                </div>
+                {!editId && (
+                  <div className="input-group">
+                    <label className="label" htmlFor="a-exchange">Börse / Handelsplatz</label>
+                    <select id="a-exchange" className="input" value={form.exchange} onChange={(e) => setForm((p) => ({ ...p, exchange: e.target.value }))}>
+                      {EXCHANGES.map((ex) => <option key={ex} value={ex}>{ex}</option>)}
+                    </select>
+                  </div>
+                )}
                 <div className="input-group">
                   <label className="label" htmlFor="a-type">Asset-Kategorie</label>
-                  <select id="a-type" className="input" value={form.type} disabled={!!editId} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
+                  <select id="a-type" className="input" value={form.type} onChange={(e) => setForm((p) => ({ ...p, type: e.target.value }))}>
                     {TYPE_OPTIONS.map((t) => <option key={t} value={t}>{t}</option>)}
                   </select>
                 </div>
               </div>
+
+              {editId && (
+                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", margin: 0 }}>
+                  Transaktions-Typ und Börse gehören zum Trade und lassen sich hier
+                  nicht ändern. Die Asset-Kategorie gilt für alle Positionen dieses Assets.
+                </p>
+              )}
 
               <div className="modal-footer">
                 <button type="button" className="btn btn-secondary" onClick={() => { setShowModal(false); setForm(EMPTY); setFormError(""); setEditId(null); }}>Abbrechen</button>

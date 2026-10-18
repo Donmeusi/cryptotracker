@@ -247,17 +247,35 @@ export async function PATCH(req: Request) {
       data.currentPrice = currentPrice;
     }
 
-    if (Object.keys(data).length === 0) {
+    // Die Asset-Kategorie gehört zum (globalen) Asset, nicht zur Position.
+    const assetType =
+      body.type === undefined ? undefined : parseAssetType(body.type);
+    if (body.type !== undefined && !assetType) {
+      return NextResponse.json(
+        { error: "Unbekannte Asset-Kategorie." },
+        { status: 400 }
+      );
+    }
+
+    if (Object.keys(data).length === 0 && !assetType) {
       return NextResponse.json(
         { error: "Keine Änderungen übergeben." },
         { status: 400 }
       );
     }
 
-    const holding = await db.holding.update({
-      where: { id: existing.id },
-      data,
-      include: { asset: true },
+    const holding = await db.$transaction(async (tx) => {
+      if (assetType) {
+        await tx.asset.update({
+          where: { id: existing.assetId },
+          data: { type: assetType },
+        });
+      }
+      return tx.holding.update({
+        where: { id: existing.id },
+        data,
+        include: { asset: true },
+      });
     });
 
     return NextResponse.json({ holding: toHoldingDto(holding) });
