@@ -223,6 +223,175 @@ export async function POST(req: Request) {
   }
 }
 
+// ─── PATCH: Trade bearbeiten, Position neu berechnen ────────────────────────
+
+export async function PATCH(req: Request) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  }
+
+  try {
+    const body = (await req.json()) as Record<string, unknown>;
+    const id = typeof body.id === "string" ? body.id : "";
+    if (!id) {
+      return NextResponse.json({ error: "Trade fehlt." }, { status: 400 });
+    }
+
+    const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
+
+    const trade = await db.trade.findFirst({
+      where: { id, portfolioId: portfolio.id },
+      include: { asset: true },
+    });
+    if (!trade) {
+      return NextResponse.json({ error: "Trade nicht gefunden." }, { status: 404 });
+    }
+
+    const data: Prisma.TradeUncheckedUpdateInput = {};
+
+    if (body.type !== undefined) {
+      const type = parseTradeType(body.type);
+      if (!type) {
+        return NextResponse.json(
+          { error: "Unbekannter Transaktions-Typ." },
+          { status: 400 }
+        );
+      }
+      data.type = type;
+    }
+
+    if (body.amount !== undefined) {
+      const amount = parseNumber(body.amount);
+      if (amount === null || amount <= 0) {
+        return NextResponse.json(
+          { error: "Bitte eine gültige Menge eingeben." },
+          { status: 400 }
+        );
+      }
+      data.amount = amount;
+    }
+
+    if (body.price !== undefined) {
+      const price = parseNumber(body.price);
+      if (price === null || price < 0) {
+        return NextResponse.json(
+          { error: "Bitte einen gültigen Kurs eingeben." },
+          { status: 400 }
+        );
+      }
+      data.price = price;
+    }
+
+    if (body.fee !== undefined) {
+      const fee = parseNumber(body.fee);
+      if (fee === null || fee < 0) {
+        return NextResponse.json(
+          { error: "Bitte eine gültige Gebühr eingeben." },
+          { status: 400 }
+        );
+      }
+      data.fee = fee;
+    }
+
+    if (body.executedAt !== undefined) {
+      const executedAt = parseDate(body.executedAt);
+      if (!executedAt) {
+        return NextResponse.json(
+          { error: "Bitte ein gültiges Datum angeben." },
+          { status: 400 }
+        );
+      }
+      data.executedAt = executedAt;
+    }
+
+    if (body.feeCurrency !== undefined) {
+      if (typeof body.feeCurrency !== "string") {
+        return NextResponse.json(
+          { error: "Ungültige Gebührenwährung." },
+          { status: 400 }
+        );
+      }
+      data.feeCurrency = body.feeCurrency.trim().toUpperCase() || "EUR";
+    }
+
+    if (body.notes !== undefined) {
+      if (body.notes !== null && typeof body.notes !== "string") {
+        return NextResponse.json({ error: "Ungültige Notiz." }, { status: 400 });
+      }
+      const notes = typeof body.notes === "string" ? body.notes.trim() : "";
+      data.notes = notes || null;
+    }
+
+    let exchangeName: string | null | undefined;
+    if (body.exchange !== undefined) {
+      if (body.exchange !== null && typeof body.exchange !== "string") {
+        return NextResponse.json(
+          { error: "Ungültige Börse." },
+          { status: 400 }
+        );
+      }
+      exchangeName =
+        typeof body.exchange === "string" ? body.exchange.trim() : "";
+    }
+
+    if (
+      Object.keys(data).length === 0 &&
+      exchangeName === undefined
+    ) {
+      return NextResponse.json(
+        { error: "Keine Änderungen übergeben." },
+        { status: 400 }
+      );
+    }
+
+    await db.$transaction(async (tx) => {
+      let exchangeId = trade.exchangeId;
+      if (exchangeName !== undefined) {
+        const exchange = await resolveExchange(tx, exchangeName);
+        exchangeId = exchange?.id ?? null;
+      }
+
+      await tx.trade.update({
+        where: { id: trade.id },
+        data: { ...data, exchangeId },
+      });
+      await rebuildHolding(tx, portfolio.id, trade.assetId, trade.asset.symbol);
+    });
+
+    const updated = await db.trade.findUnique({
+      where: { id: trade.id },
+      include: { asset: true, exchange: true },
+    });
+
+    return NextResponse.json({
+      success: true,
+      trade: updated ? toTradeDto(updated) : null,
+    });
+  } catch (error) {
+    if (error instanceof InsufficientHoldingError) {
+      return NextResponse.json(
+        { error: "Bestand reicht für diesen Verkauf nicht aus." },
+        { status: 409 }
+      );
+    }
+    if (isKnownPrismaError(error, "P2025")) {
+      return NextResponse.json({ error: "Trade nicht gefunden." }, { status: 404 });
+    }
+    console.error("Trades PATCH fehlgeschlagen:", error);
+    return NextResponse.json(
+      { error: "Trade konnte nicht gespeichert werden." },
+      { status: 500 }
+    );
+  }
+}
+
 // ─── DELETE: Trade löschen, Position neu berechnen ──────────────────────────
 
 export async function DELETE(req: Request) {

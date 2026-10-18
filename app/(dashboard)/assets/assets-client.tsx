@@ -504,7 +504,8 @@ export default function AssetsClient({
               {editId && (
                 <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", margin: 0 }}>
                   Transaktions-Typ und Börse gehören zum Trade und lassen sich hier
-                  nicht ändern. Die Asset-Kategorie gilt für alle Positionen dieses Assets.
+                  nicht ändern – Trade-Details bearbeitest du unter &bdquo;Trades&ldquo;.
+                  Die Asset-Kategorie gilt für alle Positionen dieses Assets.
                 </p>
               )}
 

@@ -2,7 +2,7 @@
 
 import { useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { Download, Loader2, FileText, Trash2 } from "lucide-react";
+import { Download, Loader2, FileText, Trash2, Edit2, X } from "lucide-react";
 import { formatCurrency } from "@/lib/format";
 import type { TradeDto } from "@/lib/portfolio";
 
@@ -25,6 +25,26 @@ const TYPE_COLORS: Record<string, string> = {
   AIRDROP: "badge-teal",
   MINING: "badge-teal",
 };
+
+const EDIT_TYPE_OPTIONS = [
+  { value: "BUY", label: "Kauf (BUY)" },
+  { value: "SELL", label: "Verkauf (SELL)" },
+  { value: "TRANSFER_IN", label: "Eingang (TRANSFER_IN)" },
+  { value: "TRANSFER_OUT", label: "Ausgang (TRANSFER_OUT)" },
+  { value: "STAKING_REWARD", label: "Staking Reward" },
+  { value: "AIRDROP", label: "Airdrop" },
+  { value: "MINING", label: "Mining" },
+];
+
+const EXCHANGE_SUGGESTIONS = [
+  "Binance",
+  "Kraken",
+  "Coinbase",
+  "Bitpanda",
+  "Bison",
+  "Trade Republic",
+  "Sonstige",
+];
 
 const FILTER_MAP: Record<string, string[]> = {
   "Alle": [],
@@ -49,6 +69,18 @@ export default function TradesClient({
   const [exchangeFilter, setExchangeFilter] = useState("Alle Börsen");
   const [csvExporting, setCsvExporting] = useState(false);
   const [pdfExporting, setPdfExporting] = useState(false);
+  const [editTrade, setEditTrade] = useState<TradeDto | null>(null);
+  const [editForm, setEditForm] = useState({
+    type: "BUY",
+    amount: "",
+    price: "",
+    fee: "",
+    exchange: "",
+    executedAt: "",
+    notes: "",
+  });
+  const [editError, setEditError] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
 
   const exchanges = useMemo(() => {
     const names = new Set<string>();
@@ -95,6 +127,67 @@ export default function TradesClient({
 
     setTrades((prev) => prev.filter((t) => t.id !== trade.id));
     router.refresh();
+  }
+
+  function openEdit(trade: TradeDto) {
+    setEditTrade(trade);
+    setEditForm({
+      type: trade.type,
+      amount: String(trade.amount),
+      price: String(trade.price),
+      fee: String(trade.fee),
+      exchange: trade.exchange ?? "",
+      executedAt: trade.executedAt.slice(0, 10),
+      notes: trade.notes ?? "",
+    });
+    setEditError("");
+  }
+
+  async function handleEditSubmit(ev: React.FormEvent) {
+    ev.preventDefault();
+    if (!editTrade) return;
+    setEditError("");
+    setSavingEdit(true);
+
+    try {
+      const res = await fetch("/api/trades", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: editTrade.id,
+          type: editForm.type,
+          amount: editForm.amount,
+          price: editForm.price,
+          fee: editForm.fee || 0,
+          exchange: editForm.exchange,
+          notes: editForm.notes,
+          executedAt: new Date(`${editForm.executedAt}T12:00:00`).toISOString(),
+        }),
+      });
+      const data = (await res.json()) as { error?: string; trade?: TradeDto };
+      if (!res.ok || !data.trade) {
+        throw new Error(data.error ?? "Trade konnte nicht gespeichert werden.");
+      }
+
+      const updated = data.trade;
+      setTrades((prev) =>
+        prev
+          .map((t) => (t.id === updated.id ? updated : t))
+          .sort(
+            (a, b) =>
+              new Date(b.executedAt).getTime() -
+              new Date(a.executedAt).getTime()
+          )
+      );
+      setEditTrade(null);
+      router.refresh();
+    } catch (error) {
+      setEditError(
+        error instanceof Error ? error.message : "Speichern fehlgeschlagen."
+      );
+    } finally {
+      setSavingEdit(false);
+    }
   }
 
   async function handleCSVExport() {
@@ -298,13 +391,22 @@ export default function TradesClient({
                         <span className="badge badge-neutral">{trade.exchange ?? "—"}</span>
                       </td>
                       <td style={{ textAlign: "right" }}>
-                        <button
-                          className="btn-icon text-red"
-                          onClick={() => handleDelete(trade)}
-                          title="Trade löschen"
-                        >
-                          <Trash2 size={14} />
-                        </button>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "var(--space-2)" }}>
+                          <button
+                            className="btn-icon"
+                            onClick={() => openEdit(trade)}
+                            title="Trade bearbeiten"
+                          >
+                            <Edit2 size={14} />
+                          </button>
+                          <button
+                            className="btn-icon text-red"
+                            onClick={() => handleDelete(trade)}
+                            title="Trade löschen"
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -315,7 +417,107 @@ export default function TradesClient({
         )}
       </div>
 
+      {editTrade && (
+        <div
+          className="modal-overlay"
+          onClick={() => {
+            setEditTrade(null);
+            setEditError("");
+          }}
+        >
+          <div className="modal" onClick={(e) => e.stopPropagation()}>
+            <div className="modal-header">
+              <div>
+                <h2 className="modal-title">Trade bearbeiten</h2>
+                <p className="modal-subtitle">
+                  {editTrade.symbol} – die Position wird nach dem Speichern neu berechnet
+                </p>
+              </div>
+              <button
+                className="modal-close"
+                onClick={() => {
+                  setEditTrade(null);
+                  setEditError("");
+                }}
+              >
+                <X size={18} />
+              </button>
+            </div>
+            <form onSubmit={handleEditSubmit} className="modal-body">
+              {editError && <div className="form-error"><span>⚠</span> {editError}</div>}
+
+              <div className="form-grid-2">
+                <div className="input-group">
+                  <label className="label" htmlFor="t-symbol">Asset</label>
+                  <input id="t-symbol" className="input mono" value={editTrade.symbol} disabled />
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="t-type">Transaktions-Typ</label>
+                  <select id="t-type" className="input" value={editForm.type} onChange={(e) => setEditForm((p) => ({ ...p, type: e.target.value }))}>
+                    {EDIT_TYPE_OPTIONS.map((t) => <option key={t.value} value={t.value}>{t.label}</option>)}
+                  </select>
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="t-amount">Menge *</label>
+                  <input id="t-amount" type="number" step="any" min="0" className="input mono" value={editForm.amount} onChange={(e) => setEditForm((p) => ({ ...p, amount: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="t-price">Kurs ({currency}) *</label>
+                  <input id="t-price" type="number" step="any" min="0" className="input mono" value={editForm.price} onChange={(e) => setEditForm((p) => ({ ...p, price: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="t-fee">Gebühr ({currency})</label>
+                  <input id="t-fee" type="number" step="any" min="0" className="input mono" value={editForm.fee} onChange={(e) => setEditForm((p) => ({ ...p, fee: e.target.value }))} />
+                </div>
+                <div className="input-group">
+                  <label className="label" htmlFor="t-date">Datum *</label>
+                  <input id="t-date" type="date" className="input mono" value={editForm.executedAt} onChange={(e) => setEditForm((p) => ({ ...p, executedAt: e.target.value }))} />
+                </div>
+              </div>
+
+              <div className="input-group">
+                <label className="label" htmlFor="t-exchange">Börse / Handelsplatz</label>
+                <input
+                  id="t-exchange"
+                  className="input"
+                  list="exchange-suggestions"
+                  autoComplete="off"
+                  value={editForm.exchange}
+                  onChange={(e) => setEditForm((p) => ({ ...p, exchange: e.target.value }))}
+                />
+                <datalist id="exchange-suggestions">
+                  {EXCHANGE_SUGGESTIONS.map((name) => <option key={name} value={name} />)}
+                </datalist>
+              </div>
+
+              <div className="input-group">
+                <label className="label" htmlFor="t-notes">Notiz</label>
+                <input id="t-notes" className="input" value={editForm.notes} onChange={(e) => setEditForm((p) => ({ ...p, notes: e.target.value }))} />
+              </div>
+
+              <div className="modal-footer">
+                <button type="button" className="btn btn-secondary" onClick={() => { setEditTrade(null); setEditError(""); }}>Abbrechen</button>
+                <button type="submit" className="btn btn-primary" disabled={savingEdit}>
+                  {savingEdit ? "Speichert..." : "Änderungen speichern"}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
       <style>{`
+        .modal-overlay { position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;padding:var(--space-4);animation:fadeIn .15s ease; }
+        .modal { background:var(--bg-card);border:1px solid var(--border-strong);border-radius:var(--radius-xl);width:100%;max-width:520px;max-height:90vh;overflow-y:auto;box-shadow:var(--shadow-lg); }
+        .modal-header { display:flex;align-items:flex-start;justify-content:space-between;padding:var(--space-6) var(--space-6) var(--space-4);border-bottom:1px solid var(--border); }
+        .modal-title { font-size:var(--text-xl);font-weight:700;color:var(--text-primary); }
+        .modal-subtitle { font-size:var(--text-sm);color:var(--text-muted);margin-top:2px; }
+        .modal-close { width:32px;height:32px;border-radius:var(--radius-md);display:flex;align-items:center;justify-content:center;color:var(--text-muted);background:none;border:none;cursor:pointer; }
+        .modal-close:hover { background:var(--bg-elevated);color:var(--text-primary); }
+        .modal-body { padding:var(--space-6);display:flex;flex-direction:column;gap:var(--space-4); }
+        .form-grid-2 { display:grid;grid-template-columns:1fr 1fr;gap:var(--space-4); }
+        .form-error { display:flex;align-items:center;gap:var(--space-2);padding:var(--space-3) var(--space-4);background:var(--red-dim);border:1px solid rgba(239,68,68,0.2);border-radius:var(--radius-md);color:var(--red);font-size:var(--text-sm); }
+        .modal-footer { display:flex;justify-content:flex-end;gap:var(--space-3);padding-top:var(--space-2);border-top:1px solid var(--border);margin-top:var(--space-2); }
         .empty-state { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-3);padding:var(--space-16) var(--space-8);text-align:center; }
         .empty-state-icon { font-size:2.5rem; }
         .empty-state h3 { font-size:var(--text-base);font-weight:600;color:var(--text-primary); }

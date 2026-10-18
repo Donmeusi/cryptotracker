@@ -13,10 +13,10 @@ export default auth((req) => {
     return NextResponse.redirect(new URL("/anmelden", req.url));
   }
 
-  if (isLoggedIn && isAuthPage) {
-    return NextResponse.redirect(new URL("/dashboard", req.url));
-  }
-
+  // Bewusst KEIN Redirect von angemeldeten Benutzern weg von /anmelden:
+  // Ein JWT kann auf einen geloeschten Benutzer zeigen. Die geschuetzten
+  // Seiten leiten dann auf /anmelden um - wuerde die Middleware von dort
+  // wieder auf /dashboard schicken, entstuende eine Redirect-Schleife.
   return NextResponse.next();
 });
 
