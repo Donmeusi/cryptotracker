@@ -1,33 +1,63 @@
 import { NextRequest, NextResponse } from "next/server";
-import { generateMockTrades } from "@/lib/mock/data";
-import { calculateTaxes } from "@/lib/tax/taxCalculator";
+import { auth } from "@/lib/auth";
+import { db } from "@/lib/db";
+import { getOrCreatePortfolio } from "@/lib/portfolio";
+import { calculateTaxes, type Trade } from "@/lib/tax/taxCalculator";
+
+export const dynamic = "force-dynamic";
 
 export async function GET(request: NextRequest) {
+  const session = await auth();
+  if (!session?.user?.id) {
+    return NextResponse.json({ error: "Nicht autorisiert" }, { status: 401 });
+  }
+
   try {
     const { searchParams } = new URL(request.url);
-    const year = searchParams.get("year") || "2024";
+    const year = searchParams.get("year") || String(new Date().getFullYear());
     const methodStr = searchParams.get("method") || "FIFO";
 
-    // Validate method
+    if (!/^\d{4}$/.test(year)) {
+      return NextResponse.json({ error: "Ungültiges Steuerjahr." }, { status: 400 });
+    }
+
     if (!["FIFO", "LIFO", "HIFO"].includes(methodStr)) {
-      return NextResponse.json({ error: "Invalid method parameter" }, { status: 400 });
+      return NextResponse.json(
+        { error: "Unbekanntes Berechnungsverfahren." },
+        { status: 400 }
+      );
     }
 
     const method = methodStr as "FIFO" | "LIFO" | "HIFO";
+    const portfolio = await getOrCreatePortfolio(session.user.id);
 
-    // Currently we use the deterministic mock trades.
-    // In Phase 13/14, this will be: await db.trade.findMany({ where: { userId } })
-    const trades = generateMockTrades();
+    const rows = await db.trade.findMany({
+      where: { portfolioId: portfolio.id },
+      include: { asset: true, exchange: true },
+      orderBy: { executedAt: "asc" },
+    });
 
-    // The tax calculator processes ALL historical trades and spits out ONLY the events for the requested year.
+    // Der Rechner verarbeitet die gesamte Historie und gibt nur die Ereignisse
+    // des gewünschten Jahres zurück.
+    const trades: Trade[] = rows.map((row) => ({
+      id: row.id,
+      asset: row.asset.symbol,
+      type: row.type,
+      exchange: row.exchange?.displayName || row.exchange?.name || "",
+      amount: row.amount,
+      price: row.price,
+      fee: row.fee,
+      executedAt: row.executedAt.toISOString(),
+    }));
+
     const result = calculateTaxes(trades, year, method);
-
-    // Simulate small latency to show loading state
-    await new Promise((resolve) => setTimeout(resolve, 600));
 
     return NextResponse.json(result);
   } catch (error) {
-    console.error("Tax calculation error:", error);
-    return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
+    console.error("Steuerberechnung fehlgeschlagen:", error);
+    return NextResponse.json(
+      { error: "Steuerberechnung fehlgeschlagen." },
+      { status: 500 }
+    );
   }
 }

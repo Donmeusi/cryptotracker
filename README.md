@@ -4,13 +4,13 @@
 
 Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wallets, NFTs, Trades und Steuerereignissen. Gebaut mit Next.js 15, Prisma ORM, NextAuth.js v5 und Recharts — mit einem hochwertigen Dark/Light-Mode-UI, Docker-Unterstützung und Live-Preisen.
 
-> **Projektstatus (Oktober 2026): UI-Prototyp mit funktionierender Anmeldung.**
-> Authentifizierung, OIDC, PDF-Import, Live-Preise, Benachrichtigungen und die
-> Steuerberechnung laufen. Die Portfolio-Seiten (Dashboard, Assets, DeFi, NFTs,
-> Trades, Börsen) zeigen jedoch **Demodaten aus `lib/mock/data.ts`** und schreiben
-> nicht in die Datenbank. Das Prisma-Schema ist vollständig angelegt, die
-> CRUD-Anbindung fehlt noch. Eine frische Installation zeigt deshalb
-> Beispielvermögen statt eines leeren Depots. Der Wallet-Scan ist simuliert.
+> **Projektstatus (Oktober 2026): Kernmodule sind datenbankgestützt.**
+> Anmeldung, OIDC, Assets, Positionen und Trades schreiben in die Datenbank;
+> Dashboard, Assets, Trades und Steuer rechnen mit deinen echten Daten.
+> Eine frische Installation startet mit einem leeren Depot. Die übrigen
+> Module sind bewusst ehrlich leer: DeFi, NFTs, Börsen-Anbindung und Analytik
+> sind noch nicht an Datenquellen angebunden, der Wallet-Scan ist simuliert.
+> Demo-Daten gibt es nicht mehr.
 
 ---
 
@@ -24,15 +24,15 @@ Ein modernes Full-Stack-Dashboard zum Verwalten von Krypto-Assets, On-Chain Wall
 | 📄 **PDF Trade-Import** | Parser zur automatischen Extraktion von Kauf/Verkauf-Transaktionen aus PDF-Kontoauszügen |
 | 📱 **Mobile Responsiv** | Vollständige Responsivität (keine horizontale Laufleiste) mit mobilem Side-Drawer Navigation |
 | 🐳 **Docker Ready** | Optimiertes Multi-Stage Dockerfile (`output: "standalone"`) & Docker Compose Setup |
-| 💼 **Assets Tracker** | Ansicht mit Demodaten; Bearbeitungen bleiben nur im Browser (CRUD nicht persistiert) |
-| 🖼️ **NFT Manager** | Ansicht mit Demodaten |
-| 📈 **Trade-Historie** | Ansicht mit Demodaten; der PDF-Import liefert echte Transaktionen |
+| 💼 **Assets Tracker** | Positionen anlegen, bearbeiten und löschen; Bestand und Einstandspreis werden aus den Trades berechnet |
+| 🖼️ **NFT Manager** | Noch nicht an die Datenbank angebunden (leere Ansicht) |
+| 📈 **Trade-Historie** | Echte Trades aus der Datenbank, Filter, CSV/PDF-Export, Löschen mit Neuberechnung der Position |
 | 🔑 **OIDC / SSO Integration** | Universal OpenID Connect Support (Pocket-ID, Keycloak, Authentik, Authelia, Zitadel) mit UI-basierter Verwaltung |
 | 🗄️ **Externe Datenbank (UI)** | PostgreSQL, MySQL / MariaDB & SQLite direkt über die Benutzeroberfläche verbinden mit Verbindungstest & Schema-Sync |
 | 🔄 **System & Updates** | Branch-Wechsel und 1-Klick-Update aus der UI; funktioniert nur in einer Installation mit git/npm, **nicht im Container** |
-| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Hover-Erklärungs-Tooltips, Haltedauer (> 365 Tage steuerfrei), PDF + CSV Export — rechnet derzeit auf Demodaten |
+| 🧮 **Steuerlogik (§ 23 EStG)** | FIFO / LIFO / HIFO Berechnung, Hover-Erklärungs-Tooltips, Haltedauer (> 365 Tage steuerfrei), PDF + CSV Export — rechnet auf deinen gespeicherten Trades |
 | 🎛️ **Modul-Steuerung** | Flexibles Ein- & Ausblenden von Bereichen (DeFi, NFTs) in der Seitenleiste über Einstellungen |
-| 🏛️ **Börsen-Anbindung** | API-Key-Eingabe im Demo-Modus; Schlüssel werden nicht serverseitig gespeichert |
+| 🏛️ **Börsen-Anbindung** | Noch nicht angebunden; die Seite zeigt bewusst keine Beispielbestände |
 | 🎨 **Themes & Personalisierung** | 4 Themes (Dark, Midnight, Light, Forest) + 5 Akzentfarben, dynamisches `color-scheme` |
 
 ---

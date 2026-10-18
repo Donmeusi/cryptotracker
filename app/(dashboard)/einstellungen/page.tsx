@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useSession } from "next-auth/react";
 import {
   User, Shield, Database, Bell, Palette, ChevronRight,
@@ -8,7 +9,6 @@ import {
   CloudDownload, GitBranch,
 } from "lucide-react";
 import { downloadCSV, downloadJSON } from "@/lib/exportUtils";
-import { MOCK_HOLDINGS, MOCK_ASSETS, generateMockTrades, MOCK_DEFI_POSITIONS, MOCK_NFTS } from "@/lib/mock/data";
 
 const WAEHRUNGEN = [
   { code: "EUR", name: "Euro (€)" },
@@ -1372,17 +1372,134 @@ function DbConfigPanel() {
   );
 }
 
+type ExportTrade = {
+  symbol: string;
+  type: string;
+  amount: number;
+  price: number;
+  fee: number;
+  exchange: string | null;
+  executedAt: string;
+};
+
+type ExportTaxEvent = {
+  asset: string;
+  buyDate: string;
+  sellDate: string;
+  holdingDays: number;
+  costBasis: number;
+  proceeds: number;
+  gainLoss: number;
+  type: string;
+};
+
 export default function EinstellungenPage() {
-  const { data: session } = useSession();
+  const router = useRouter();
+  const { data: session, update } = useSession();
   const user = session?.user as { name?: string; email?: string; currency?: string } | undefined;
   const currency = user?.currency || "EUR";
 
   const [activeTab, setActiveTab] = useState<Tab>("profil");
   const [saveStatus, setSaveStatus] = useState<"idle" | "saved" | "error">("idle");
 
-  function handleSave() {
-    setSaveStatus("saved");
-    setTimeout(() => setSaveStatus("idle"), 2500);
+  async function handleProfileSave() {
+    const name = (document.getElementById("s-name") as HTMLInputElement | null)?.value?.trim() ?? "";
+    const newCurrency =
+      (document.getElementById("s-currency") as HTMLSelectElement | null)?.value ?? currency;
+
+    try {
+      const res = await fetch("/api/profile", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, currency: newCurrency }),
+      });
+      if (!res.ok) throw new Error("save failed");
+
+      await update({ name, currency: newCurrency });
+      setSaveStatus("saved");
+      router.refresh();
+    } catch {
+      setSaveStatus("error");
+    } finally {
+      setTimeout(() => setSaveStatus("idle"), 2500);
+    }
+  }
+
+  async function handlePortfolioExport() {
+    const [holdingsRes, tradesRes] = await Promise.all([
+      fetch("/api/holdings", { cache: "no-store" }),
+      fetch("/api/trades", { cache: "no-store" }),
+    ]);
+    const holdings = holdingsRes.ok ? await holdingsRes.json() : { holdings: [] };
+    const trades = tradesRes.ok ? await tradesRes.json() : { trades: [] };
+    downloadJSON(
+      { holdings, trades, exportedAt: new Date().toISOString() },
+      "CryptoTracker_Portfolio.json"
+    );
+  }
+
+  async function handleTradesExport() {
+    const res = await fetch("/api/trades", { cache: "no-store" });
+    const data = res.ok ? ((await res.json()) as { trades?: ExportTrade[] }) : {};
+    downloadCSV(
+      (data.trades ?? []).map((t) => ({
+        Datum: new Date(t.executedAt).toLocaleDateString("de-DE"),
+        Typ: t.type,
+        Asset: t.symbol,
+        Menge: t.amount.toFixed(6),
+        Kurs_EUR: t.price.toFixed(2),
+        Summe_EUR: (t.amount * t.price).toFixed(2),
+        Gebühr_EUR: t.fee.toFixed(2),
+        Börse: t.exchange ?? "",
+      })),
+      "CryptoTracker_Trades.csv"
+    );
+  }
+
+  async function handleTaxExport() {
+    const year = new Date().getFullYear();
+    const res = await fetch(`/api/tax?year=${year}&method=FIFO`, { cache: "no-store" });
+    const data = res.ok ? ((await res.json()) as { events?: ExportTaxEvent[] }) : {};
+    downloadCSV(
+      (data.events ?? []).map((e) => ({
+        Steuerjahr: year,
+        Asset: e.asset,
+        Kaufdatum: new Date(e.buyDate).toLocaleDateString("de-DE"),
+        Verkaufsdatum: new Date(e.sellDate).toLocaleDateString("de-DE"),
+        Haltedauer_Tage: e.holdingDays,
+        Einstandspreis: e.costBasis.toFixed(2),
+        Erloese: e.proceeds.toFixed(2),
+        "G&V": e.gainLoss.toFixed(2),
+        Typ: e.type === "LONG_TERM" ? "Langfristig" : "Kurzfristig",
+      })),
+      `CryptoTracker_Steuerbericht_${year}.csv`
+    );
+  }
+
+  async function handleDeleteAllData() {
+    const confirmed = window.prompt(
+      'Gib "LÖSCHEN" ein, um alle Portfolio-Daten unwiderruflich zu löschen:'
+    );
+    if (confirmed === null) return;
+    if (confirmed !== "LÖSCHEN") {
+      alert("Bestätigung fehlgeschlagen. Keine Daten wurden gelöscht.");
+      return;
+    }
+
+    try {
+      const res = await fetch("/api/portfolio/reset", { method: "POST" });
+      const data = (await res.json().catch(() => ({}))) as {
+        error?: string;
+        deleted?: { trades: number; holdings: number };
+      };
+      if (!res.ok) throw new Error(data.error ?? "Löschen fehlgeschlagen.");
+      alert(
+        `Gelöscht: ${data.deleted?.trades ?? 0} Trades und ${data.deleted?.holdings ?? 0} Positionen.`
+      );
+      router.refresh();
+    } catch (error) {
+      alert(error instanceof Error ? error.message : "Löschen fehlgeschlagen.");
+    }
   }
 
   return (
@@ -1453,12 +1570,17 @@ export default function EinstellungenPage() {
                   </select>
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                  <button className="btn btn-primary" onClick={handleSave}>
+                  <button className="btn btn-primary" onClick={handleProfileSave}>
                     Speichern
                   </button>
                   {saveStatus === "saved" && (
                     <span className="save-feedback success">
                       <CheckCircle size={14} /> Gespeichert
+                    </span>
+                  )}
+                  {saveStatus === "error" && (
+                    <span style={{ fontSize: "var(--text-sm)", color: "var(--red)" }}>
+                      Speichern fehlgeschlagen
                     </span>
                   )}
                 </div>
@@ -1484,14 +1606,16 @@ export default function EinstellungenPage() {
                   <input id="s-confirm-pw" className="input" type="password" placeholder="••••••••" />
                 </div>
                 <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                  <button className="btn btn-secondary" onClick={handleSave}>
+                  <button
+                    className="btn btn-secondary"
+                    disabled
+                    title="Passwortänderung ist noch nicht implementiert."
+                  >
                     Passwort aktualisieren
                   </button>
-                  {saveStatus === "saved" && (
-                    <span className="save-feedback success">
-                      <CheckCircle size={14} /> Aktualisiert
-                    </span>
-                  )}
+                  <span style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                    Passwortänderung ist noch nicht verfügbar.
+                  </span>
                 </div>
               </div>
 
@@ -1577,49 +1701,13 @@ export default function EinstellungenPage() {
                   Exportiere alle deine Portfolio-Daten, Trades und Steuerereignisse.
                 </p>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "var(--space-3)" }}>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      downloadJSON(
-                        { holdings: MOCK_HOLDINGS, assets: MOCK_ASSETS, defi: MOCK_DEFI_POSITIONS, nfts: MOCK_NFTS, exportedAt: new Date().toISOString() },
-                        "CryptoTracker_Portfolio.json"
-                      );
-                    }}
-                  >
+                  <button className="btn btn-secondary" onClick={handlePortfolioExport}>
                     <Download size={14} /> Portfolio (JSON)
                   </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      downloadCSV(
-                        generateMockTrades().map((t) => ({
-                          Datum: new Date(t.executedAt).toLocaleDateString("de-DE"),
-                          Typ: t.type,
-                          Asset: t.asset,
-                          Menge: t.amount.toFixed(6),
-                          Kurs_EUR: t.price.toFixed(2),
-                          Summe_EUR: (t.amount * t.price).toFixed(2),
-                          Gebühr_EUR: t.fee.toFixed(2),
-                          Börse: t.exchange,
-                        })),
-                        "CryptoTracker_Trades.csv"
-                      );
-                    }}
-                  >
+                  <button className="btn btn-secondary" onClick={handleTradesExport}>
                     <Download size={14} /> Trades (CSV)
                   </button>
-                  <button
-                    className="btn btn-secondary"
-                    onClick={() => {
-                      downloadCSV(
-                        [
-                          { Steuerjahr: 2024, Asset: "BTC", Kaufdatum: "15.03.2023", Verkaufsdatum: "20.01.2024", Haltedauer_Tage: 311, Einstandspreis: "2800.00", Erlöse: "8723.00", "G&V": "5923.00", Typ: "Langfristig" },
-                          { Steuerjahr: 2024, Asset: "ETH", Kaufdatum: "10.11.2023", Verkaufsdatum: "14.02.2024", Haltedauer_Tage: 96, Einstandspreis: "2850.00", Erlöse: "3472.00", "G&V": "622.00", Typ: "Kurzfristig" },
-                        ],
-                        "CryptoTracker_Steuerbericht_2024.csv"
-                      );
-                    }}
-                  >
+                  <button className="btn btn-secondary" onClick={handleTaxExport}>
                     <Download size={14} /> Steuern (CSV)
                   </button>
                 </div>
@@ -1631,33 +1719,22 @@ export default function EinstellungenPage() {
                 <p style={{ fontSize: "var(--text-sm)", color: "var(--text-secondary)", marginBottom: "var(--space-5)" }}>
                   Diese Aktionen sind unwiderruflich. Bitte mit Vorsicht verwenden.
                 </p>
-                <div style={{ display: "flex", gap: "var(--space-3)" }}>
+                <div style={{ display: "flex", gap: "var(--space-3)", flexWrap: "wrap" }}>
                   <button
                     className="btn btn-danger"
-                    onClick={() => {
-                      if (window.confirm("Möchtest du deinen Account wirklich deaktivieren? Diese Aktion kann nicht rükgängig gemacht werden.")) {
-                        alert("Account-Deaktivierung ist im Demo-Modus nicht verfügbar.");
-                      }
-                    }}
+                    disabled
+                    title="Konto-Deaktivierung ist noch nicht implementiert."
                   >
                     Account deaktivieren
                   </button>
-                  <button
-                    className="btn btn-danger"
-                    onClick={() => {
-                      const confirmed = window.prompt(
-                        'Gib "LÖSCHEN" ein, um alle Daten unwiderruflich zu löschen:'
-                      );
-                      if (confirmed === "LÖSCHEN") {
-                        alert("Daten-Löschung ist im Demo-Modus nicht verfügbar.");
-                      } else if (confirmed !== null) {
-                        alert("Bestätigung fehlgeschlagen. Keine Daten wurden gelöscht.");
-                      }
-                    }}
-                  >
+                  <button className="btn btn-danger" onClick={handleDeleteAllData}>
                     Alle Daten löschen
                   </button>
                 </div>
+                <p style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)", marginTop: "var(--space-3)" }}>
+                  „Alle Daten löschen“ entfernt alle Trades und Positionen deines
+                  Portfolios. Der Zugang und die Einstellungen bleiben bestehen.
+                </p>
               </div>
             </div>
           )}

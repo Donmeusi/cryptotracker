@@ -122,10 +122,17 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
     },
   ],
   callbacks: {
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session }) {
       if (user) {
         token.id = user.id;
         token.currency = (user as { currency?: string }).currency ?? "EUR";
+      }
+      // Profiländerungen aus der Oberfläche (useSession().update) übernehmen,
+      // damit Name und Währung ohne neue Anmeldung stimmen.
+      if (trigger === "update" && session) {
+        const patch = session as { name?: unknown; currency?: unknown };
+        if (typeof patch.name === "string") token.name = patch.name;
+        if (typeof patch.currency === "string") token.currency = patch.currency;
       }
       return token;
     },

@@ -17,8 +17,20 @@ Das Format basiert auf [Keep a Changelog](https://keepachangelog.com/de/1.0.0/) 
 - Build-Artefakte aus dem Repo: `tsconfig.tsbuildinfo`, `prisma/db-config.json` und zwei `__pycache__`-Dateien. Alle drei sind jetzt gitignored; `db-config.json` enthält Laufzeit-Zugangsdaten.
 - Totes Script `db:seed` (verwies auf ein nicht vorhandenes `prisma/seed.ts`) und die nur dafür genutzte `tsx`-Abhängigkeit.
 
+### Hinzugefügt (Added)
+- **Datenbankanbindung der Kernmodule:** Assets/Positionen und Trades werden gespeichert. Positionen werden aus der Trade-Historie berechnet: Käufe mitteln den Einstandspreis, Zuflüsse (Transfer, Staking, Airdrop) erhöhen nur die Menge, Verkäufe reduzieren sie.
+- Neue API-Routen: `/api/holdings` (GET/POST/PATCH/DELETE), `/api/trades` (GET/POST/DELETE), `/api/trades/bulk` (idempotenter PDF-Import), `/api/portfolio/reset` (alle Portfolio-Daten löschen) und `/api/profile` (Name/Währung).
+- Ein Portfolio pro Benutzer, wird bei Bedarf automatisch angelegt – auch für OIDC-Konten, die der Prisma-Adapter ohne Portfolio erstellt.
+- Steuerberechnung (`/api/tax`) rechnet auf den gespeicherten Trades statt auf Mock-Daten.
+- Dashboard, Assets und Trades werden serverseitig mit echten Daten gerendert; die Exporte in den Einstellungen nutzen echte Daten.
+- Einstellungen: Profil speichern und „Alle Daten löschen“ funktionieren jetzt.
+
+### Entfernt (Removed)
+- `lib/mock/data.ts` vollständig entfernt. DeFi, NFTs, Börsen und Analytik zeigen ehrliche Leerzustände statt Beispieldaten; nicht persistierende Formulare wurden entfernt bzw. deaktiviert.
+- Zufallskurse als Fallback und zufällige Portfolioverläufe.
+
 ### Dokumentation
-- README: Projektstatus ergänzt. Die Portfolio-Seiten und der Wallet-Scan sind ausdrücklich als Demo gekennzeichnet; das Prisma-Schema ist angelegt, die CRUD-Anbindung fehlt.
+- README: Projektstatus beschreibt die datenbankgestützten Kernmodule, die bewusst leeren übrigen Module und den weiterhin simulierten Wallet-Scan.
 - `.env.example` ergänzt.
 
 ## [v0.3.0] - 2026-08-19

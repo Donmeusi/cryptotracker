@@ -1,39 +1,41 @@
 "use client";
 
 import { useState, useEffect, useTransition } from "react";
-import {
-  MOCK_ASSETS,
-  MOCK_HOLDINGS,
-  MOCK_DEFI_POSITIONS,
-  calculatePortfolioValue,
-  calculatePnL,
-  formatCurrency,
-  formatPercent,
-} from "@/lib/mock/data";
+import { calculatePortfolioValue, calculatePnL, formatCurrency, formatPercent } from "@/lib/format";
+import type { HoldingDto } from "@/lib/portfolio";
 
-type Asset = typeof MOCK_ASSETS[number];
+type Asset = {
+  symbol: string;
+  name: string;
+  price: number;
+  priceChange24h: number;
+};
 
 import AllocationChart from "@/components/dashboard/AllocationChart";
 import {
-  TrendingUp, TrendingDown, ArrowUpRight, Activity, Layers, Coins,
+  TrendingUp, TrendingDown, ArrowUpRight, Activity, Coins,
   RefreshCw, Clock
 } from "lucide-react";
 
 interface LiveDashboardProps {
   userName: string;
   currency: string;
+  initialHoldings: HoldingDto[];
   initialAssets: Asset[];
 }
 
 export default function LiveDashboard({
   userName,
   currency,
+  initialHoldings,
   initialAssets,
 }: LiveDashboardProps) {
+  const holdings = initialHoldings;
   const [assets, setAssets] = useState<Asset[]>(initialAssets);
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date());
+  const [priceError, setPriceError] = useState(false);
   const [flashMap, setFlashMap] = useState<Record<string, "up" | "down"> >({});
   const [, startTransition] = useTransition();
 
@@ -61,30 +63,13 @@ export default function LiveDashboard({
         })
       );
 
+      setPriceError(false);
       setFlashMap(newFlashes);
       setLastUpdated(new Date());
-
-      // Reset flash animation after 1.2s
       setTimeout(() => setFlashMap({}), 1200);
     } catch {
-      // Fallback: apply minor random fluctuation for demo
-      const newFlashes: Record<string, "up" | "down"> = {};
-      setAssets((prevAssets) =>
-        prevAssets.map((asset) => {
-          const deltaPct = (Math.random() - 0.48) * 0.008;
-          const newPrice = Math.max(0.001, asset.price * (1 + deltaPct));
-          if (newPrice > asset.price) newFlashes[asset.symbol] = "up";
-          else if (newPrice < asset.price) newFlashes[asset.symbol] = "down";
-
-          return {
-            ...asset,
-            price: parseFloat(newPrice.toFixed(asset.price > 100 ? 2 : 4)),
-          };
-        })
-      );
-      setFlashMap(newFlashes);
-      setLastUpdated(new Date());
-      setTimeout(() => setFlashMap({}), 1200);
+      // Kurse bleiben auf dem letzten bekannten Stand - keine Zufallswerte.
+      setPriceError(true);
     } finally {
       setIsRefreshing(false);
     }
@@ -101,22 +86,33 @@ export default function LiveDashboard({
     return () => clearInterval(interval);
   }, [autoRefresh]);
 
-  const portfolioValue = calculatePortfolioValue(MOCK_HOLDINGS, assets);
-  const { absolute: pnlAbsolute, percent: pnlPercent } = calculatePnL(MOCK_HOLDINGS, assets);
+  const portfolioValue = calculatePortfolioValue(holdings, assets);
+  const { absolute: pnlAbsolute, percent: pnlPercent } = calculatePnL(holdings, assets);
   const isPositive = pnlAbsolute >= 0;
 
-  const defiValue = MOCK_DEFI_POSITIONS.reduce((sum, p) => sum + p.valueUsd, 0);
-  const totalValue = portfolioValue + defiValue;
-
   // Allocation data
-  const allocationData = MOCK_HOLDINGS.map((h) => {
-    const asset = assets.find((a) => a.symbol === h.symbol) || { price: 0 };
-    return {
-      name: h.symbol,
-      value: parseFloat(((h.amount * asset.price / portfolioValue) * 100).toFixed(1)),
-      amount: h.amount * asset.price,
-    };
-  }).sort((a, b) => b.value - a.value);
+  const allocationData = holdings
+    .map((h) => {
+      const asset = assets.find((a) => a.symbol === h.symbol) || { price: 0 };
+      const marketValue = h.amount * asset.price;
+      return {
+        name: h.symbol,
+        value:
+          portfolioValue > 0
+            ? parseFloat(((marketValue / portfolioValue) * 100).toFixed(1))
+            : 0,
+        amount: marketValue,
+      };
+    })
+    .sort((a, b) => b.value - a.value);
+
+  const topHoldings = [...holdings]
+    .map((h) => {
+      const asset = assets.find((a) => a.symbol === h.symbol);
+      return { holding: h, asset };
+    })
+    .filter((entry): entry is { holding: HoldingDto; asset: Asset } => !!entry.asset)
+    .sort((a, b) => b.holding.amount * b.asset.price - a.holding.amount * a.asset.price);
 
   return (
     <div className="page-container fade-in">
@@ -157,7 +153,7 @@ export default function LiveDashboard({
       <div className="grid-4" style={{ marginBottom: "var(--space-6)" }}>
         <div className="stat-card nw-card">
           <div className="stat-label">Gesamtvermögen</div>
-          <div className="stat-value mono">{formatCurrency(totalValue, currency)}</div>
+          <div className="stat-value mono">{formatCurrency(portfolioValue, currency)}</div>
           <div className={`stat-change ${isPositive ? "positive" : "negative"}`}>
             {isPositive ? <TrendingUp size={14} /> : <TrendingDown size={14} />}
             <span>{formatCurrency(Math.abs(pnlAbsolute), currency)}</span>
@@ -173,18 +169,18 @@ export default function LiveDashboard({
           <div className="stat-value mono" style={{ fontSize: "var(--text-2xl)" }}>
             {formatCurrency(portfolioValue, currency)}
           </div>
-          <div className="stat-change neutral">{MOCK_HOLDINGS.length} Assets</div>
+          <div className="stat-change neutral">{holdings.length} Assets</div>
         </div>
 
         <div className="stat-card">
           <div className="stat-label">
-            <Layers size={12} style={{ display: "inline", marginRight: 4 }} />
-            DeFi-Wert
+            <Activity size={12} style={{ display: "inline", marginRight: 4 }} />
+            Positionen
           </div>
           <div className="stat-value mono" style={{ fontSize: "var(--text-2xl)" }}>
-            {formatCurrency(defiValue, currency)}
+            {holdings.length}
           </div>
-          <div className="stat-change neutral">{MOCK_DEFI_POSITIONS.length} Protokolle</div>
+          <div className="stat-change neutral">im Depot</div>
         </div>
 
         <div className="stat-card">
@@ -195,9 +191,9 @@ export default function LiveDashboard({
           <div className="stat-value mono" style={{ fontSize: "var(--text-xl)" }}>
             {lastUpdated.toLocaleTimeString("de-DE")}
           </div>
-          <div className="stat-change positive">
+          <div className={`stat-change ${priceError ? "negative" : "positive"}`}>
             <Clock size={13} />
-            <span>Auto-Sync {autoRefresh ? "aktiv" : "aus"}</span>
+            <span>{priceError ? "Kurse nicht erreichbar" : `Auto-Sync ${autoRefresh ? "aktiv" : "aus"}`}</span>
           </div>
         </div>
       </div>
@@ -211,7 +207,15 @@ export default function LiveDashboard({
               <p className="card-subtitle">Nach Marktwert</p>
             </div>
           </div>
-          <AllocationChart data={allocationData} currency={currency} />
+          {allocationData.length === 0 ? (
+            <div className="empty-state">
+              <div className="empty-state-icon">🥧</div>
+              <h3>Noch keine Verteilung</h3>
+              <p>Erfasse unter &apos;Assets&apos; deine erste Position.</p>
+            </div>
+          ) : (
+            <AllocationChart data={allocationData} currency={currency} />
+          )}
         </div>
       </div>
 
@@ -240,64 +244,77 @@ export default function LiveDashboard({
               </tr>
             </thead>
             <tbody>
-              {MOCK_HOLDINGS.map((holding) => {
-                const asset = assets.find((a) => a.symbol === holding.symbol);
-                if (!asset) return null;
-                const marketValue = holding.amount * asset.price;
-                const costBasis = holding.amount * holding.avgBuyPrice;
-                const pnl = marketValue - costBasis;
-                const pnlPct = (pnl / costBasis) * 100;
-                const allocation = ((marketValue / portfolioValue) * 100).toFixed(1);
-                const isUp = asset.priceChange24h >= 0;
-                const flashClass = flashMap[asset.symbol] === "up" ? "flash-green" : flashMap[asset.symbol] === "down" ? "flash-red" : "";
+              {topHoldings.length === 0 ? (
+                <tr>
+                  <td colSpan={7}>
+                    <div className="empty-state">
+                      <div className="empty-state-icon">💼</div>
+                      <h3>Noch keine Positionen</h3>
+                      <p>Erfasse unter &apos;Assets&apos; deinen ersten Trade.</p>
+                    </div>
+                  </td>
+                </tr>
+              ) : (
+                topHoldings.map(({ holding, asset }) => {
+                  const marketValue = holding.amount * asset.price;
+                  const costBasis = holding.amount * holding.avgBuyPrice;
+                  const pnl = marketValue - costBasis;
+                  const pnlPct = costBasis > 0 ? (pnl / costBasis) * 100 : 0;
+                  const allocation =
+                    portfolioValue > 0
+                      ? ((marketValue / portfolioValue) * 100).toFixed(1)
+                      : "0.0";
+                  const isUp = asset.priceChange24h >= 0;
+                  const flashClass = flashMap[asset.symbol] === "up" ? "flash-green" : flashMap[asset.symbol] === "down" ? "flash-red" : "";
 
-                return (
-                  <tr key={holding.symbol} className={flashClass}>
-                    <td>
-                      <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
-                        <div className="asset-icon asset-icon-sm">
-                          {asset.symbol.charAt(0)}
-                        </div>
-                        <div>
-                          <div style={{ color: "var(--text-primary)", fontWeight: 600 }}>
-                            {asset.symbol}
+                  return (
+                    <tr key={holding.id} className={flashClass}>
+                      <td>
+                        <div style={{ display: "flex", alignItems: "center", gap: "var(--space-3)" }}>
+                          <div className="asset-icon asset-icon-sm">
+                            {asset.symbol.charAt(0)}
                           </div>
-                          <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
-                            {asset.name}
+                          <div>
+                            <div style={{ color: "var(--text-primary)", fontWeight: 600 }}>
+                              {asset.symbol}
+                            </div>
+                            <div style={{ fontSize: "var(--text-xs)", color: "var(--text-muted)" }}>
+                              {asset.name}
+                            </div>
                           </div>
                         </div>
-                      </div>
-                    </td>
-                    <td className="mono">{holding.amount.toFixed(asset.price > 100 ? 4 : 2)}</td>
-                    <td className={`mono primary ${flashClass}`}>
-                      {formatCurrency(asset.price, currency)}
-                    </td>
-                    <td>
-                      <span className={`badge ${isUp ? "badge-green" : "badge-red"}`}>
-                        {isUp ? "▲" : "▼"} {Math.abs(asset.priceChange24h).toFixed(2)}%
-                      </span>
-                    </td>
-                    <td className="mono primary">{formatCurrency(marketValue, currency)}</td>
-                    <td>
-                      <div className="allocation-bar-wrap">
-                        <div
-                          className="allocation-bar"
-                          style={{ width: `${allocation}%` }}
-                        />
-                        <span>{allocation}%</span>
-                      </div>
-                    </td>
-                    <td>
-                      <div className={pnl >= 0 ? "positive" : "negative"} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>
-                        {pnl >= 0 ? "+" : ""}{formatCurrency(pnl, currency)}
-                        <div style={{ fontSize: "var(--text-xs)", opacity: 0.7 }}>
-                          {formatPercent(pnlPct)}
+                      </td>
+                      <td className="mono">{holding.amount.toFixed(asset.price > 100 ? 4 : 2)}</td>
+                      <td className={`mono primary ${flashClass}`}>
+                        {formatCurrency(asset.price, currency)}
+                      </td>
+                      <td>
+                        <span className={`badge ${isUp ? "badge-green" : "badge-red"}`}>
+                          {isUp ? "▲" : "▼"} {Math.abs(asset.priceChange24h).toFixed(2)}%
+                        </span>
+                      </td>
+                      <td className="mono primary">{formatCurrency(marketValue, currency)}</td>
+                      <td>
+                        <div className="allocation-bar-wrap">
+                          <div
+                            className="allocation-bar"
+                            style={{ width: `${allocation}%` }}
+                          />
+                          <span>{allocation}%</span>
                         </div>
-                      </div>
-                    </td>
-                  </tr>
-                );
-              })}
+                      </td>
+                      <td>
+                        <div className={pnl >= 0 ? "positive" : "negative"} style={{ fontFamily: "var(--font-mono)", fontSize: "var(--text-sm)" }}>
+                          {pnl >= 0 ? "+" : ""}{formatCurrency(pnl, currency)}
+                          <div style={{ fontSize: "var(--text-xs)", opacity: 0.7 }}>
+                            {formatPercent(pnlPct)}
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
+              )}
             </tbody>
           </table>
         </div>
@@ -377,6 +394,10 @@ export default function LiveDashboard({
           border-radius: var(--radius-full);
           min-width: 4px;
         }
+        .empty-state { display:flex;flex-direction:column;align-items:center;justify-content:center;gap:var(--space-3);padding:var(--space-10) var(--space-6);text-align:center; }
+        .empty-state-icon { font-size:2.5rem; }
+        .empty-state h3 { font-size:var(--text-base);font-weight:600;color:var(--text-primary); }
+        .empty-state p { font-size:var(--text-sm);color:var(--text-muted); }
         .spin { animation: spin 1s linear infinite; }
         @keyframes spin { to { transform: rotate(360deg); } }
       `}</style>

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from "recharts";
-import { formatCurrency } from "@/lib/mock/data";
+import { formatCurrency } from "@/lib/format";
 
 const ASSET_COLORS: Record<string, string> = {
   BTC: "#f7931a",

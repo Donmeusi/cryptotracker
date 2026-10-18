@@ -3,7 +3,7 @@
 import {
   AreaChart, Area, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
 } from "recharts";
-import { formatCurrency } from "@/lib/mock/data";
+import { formatCurrency } from "@/lib/format";
 
 interface HistoryPoint {
   date: string;

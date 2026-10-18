@@ -1,16 +1,27 @@
-import { useState, useEffect } from "react";
-import { MOCK_ASSETS } from "@/lib/mock/data";
+"use client";
+
+import { useState, useEffect, useCallback } from "react";
+import type { PricesMap } from "@/lib/livePrices";
 
 export type LivePriceData = {
   price: number;
   change24h: number;
 };
 
-export type PricesMap = Record<string, LivePriceData>;
+export type { PricesMap };
 
-export function useLivePrices(refreshIntervalMs = 60000) {
-  const [prices, setPrices] = useState<PricesMap | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+type PriceableAsset = {
+  symbol: string;
+  price?: number;
+  priceChange24h?: number;
+};
+
+export function useLivePrices(
+  refreshIntervalMs = 60000,
+  initialPrices: PricesMap | null = null
+) {
+  const [prices, setPrices] = useState<PricesMap | null>(initialPrices);
+  const [isLoading, setIsLoading] = useState(!initialPrices);
   const [error, setError] = useState<Error | null>(null);
   const [isFallback, setIsFallback] = useState(false);
 
@@ -21,17 +32,12 @@ export function useLivePrices(refreshIntervalMs = 60000) {
       try {
         const res = await fetch("/api/prices");
         if (!res.ok) throw new Error("Network response was not ok");
-        
-        const data = await res.json();
-        
+
+        const data = (await res.json()) as PricesMap;
+
         if (mounted) {
-          if (data._isFallback) {
-            setIsFallback(true);
-            delete data._isFallback;
-          } else {
-            setIsFallback(false);
-          }
           setPrices(data);
+          setIsFallback(Object.keys(data).length === 0);
           setIsLoading(false);
           setError(null);
         }
@@ -39,12 +45,7 @@ export function useLivePrices(refreshIntervalMs = 60000) {
         if (mounted) {
           console.error("useLivePrices error:", err);
           setError(err instanceof Error ? err : new Error("Unknown error"));
-          // Load fallback data directly on critical failure
-          const fallback: PricesMap = {};
-          for (const a of MOCK_ASSETS) {
-            fallback[a.symbol] = { price: a.price, change24h: a.priceChange24h };
-          }
-          setPrices(fallback);
+          // Letzten bekannten Kurs behalten - keine erfundenen Kurse.
           setIsFallback(true);
           setIsLoading(false);
         }
@@ -61,25 +62,24 @@ export function useLivePrices(refreshIntervalMs = 60000) {
       };
     }
 
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [refreshIntervalMs]);
 
-  // Helper function to inject live prices into our MOCK_ASSETS list
-  const injectLivePrices = (assets: typeof MOCK_ASSETS) => {
-    if (!prices) return assets;
-    
-    return assets.map(asset => {
-      const liveData = prices[asset.symbol];
-      if (liveData) {
+  // Überträgt die geladenen Kurse auf eine beliebige Asset-Liste.
+  const injectLivePrices = useCallback(
+    <T extends PriceableAsset>(assets: T[]) =>
+      assets.map((asset) => {
+        const live = prices?.[asset.symbol];
         return {
           ...asset,
-          price: liveData.price,
-          priceChange24h: liveData.change24h
+          price: live?.price ?? asset.price ?? 0,
+          priceChange24h: live?.change24h ?? asset.priceChange24h ?? 0,
         };
-      }
-      return asset;
-    });
-  };
+      }),
+    [prices]
+  );
 
   return { prices, isLoading, error, isFallback, injectLivePrices };
 }

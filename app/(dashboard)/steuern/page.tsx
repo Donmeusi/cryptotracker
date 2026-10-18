@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { formatCurrency } from "@/lib/mock/data";
+import { formatCurrency } from "@/lib/format";
 import { FileText, Download, Calculator, Info, Loader2 } from "lucide-react";
 import { downloadCSV, generateTaxPDF } from "@/lib/exportUtils";
 import { TaxResult, TaxEvent } from "@/lib/tax/taxCalculator";
@@ -31,7 +31,10 @@ const METHOD_DETAILS: Record<
 };
 
 export default function SteuernPage() {
-  const [selectedYear, setSelectedYear] = useState("2024");
+  const [selectedYear, setSelectedYear] = useState(String(new Date().getFullYear()));
+  const taxYears = Array.from({ length: 5 }, (_, i) =>
+    String(new Date().getFullYear() - i)
+  );
   const [selectedMethod, setSelectedMethod] = useState<"FIFO" | "LIFO" | "HIFO">("FIFO");
   const [exporting, setExporting] = useState<"idle" | "csv" | "pdf">("idle");
   const [taxData, setTaxData] = useState<TaxResult | null>(null);
@@ -120,7 +123,7 @@ export default function SteuernPage() {
       <div style={{ display: "flex", alignItems: "center", gap: "var(--space-4)", marginBottom: "var(--space-6)", flexWrap: "wrap" }}>
         {/* Jahr-Tabs */}
         <div className="tab-list">
-          {["2024", "2023", "2022"].map((year) => (
+          {taxYears.map((year) => (
             <button
               key={year}
               className={`tab-btn ${selectedYear === year ? "active" : ""}`}

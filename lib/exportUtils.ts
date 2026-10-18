@@ -353,7 +353,7 @@ export function generateTradesPDF(params: {
     <tbody>${rows}</tbody>
   </table>
   <div class="footer">
-    <span>CryptoTracker &mdash; Demo-Daten</span>
+    <span>CryptoTracker</span>
     <span>${now} &bull; ${params.trades.length} Transaktionen &bull; Volumen: ${fmtNum(totalVol)} €</span>
   </div>
   <script>window.onload = function() { window.print(); };</script>
