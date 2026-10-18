@@ -30,6 +30,12 @@ export async function GET(request: NextRequest) {
 
     const method = methodStr as "FIFO" | "LIFO" | "HIFO";
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
 
     const rows = await db.trade.findMany({
       where: { portfolioId: portfolio.id },

@@ -17,6 +17,7 @@ export default async function DashboardPage() {
   const userName = session?.user?.name?.split(" ")[0] || "Investor";
 
   const portfolio = await getOrCreatePortfolio(session.user.id);
+  if (!portfolio) redirect("/anmelden");
   const holdings = await db.holding.findMany({
     where: { portfolioId: portfolio.id },
     include: { asset: true },

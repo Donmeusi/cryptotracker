@@ -15,6 +15,7 @@ export default async function TradesPage() {
   const currency =
     (session.user as { currency?: string }).currency || "EUR";
   const portfolio = await getOrCreatePortfolio(session.user.id);
+  if (!portfolio) redirect("/anmelden");
   const trades = await db.trade.findMany({
     where: { portfolioId: portfolio.id },
     include: { asset: true, exchange: true },

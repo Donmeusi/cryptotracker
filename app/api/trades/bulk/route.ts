@@ -155,6 +155,12 @@ export async function POST(req: Request) {
     }
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
 
     const created = await db.$transaction(async (tx) => {
       const affectedAssets = new Map<string, string>();

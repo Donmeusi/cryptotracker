@@ -28,6 +28,16 @@ export function normalizeSymbol(symbol: string): string {
  * beim ersten Zugriff.
  */
 export async function getOrCreatePortfolio(userId: string) {
+  // Ein JWT kann auf einen gelöschten Benutzer zeigen (z. B. nach dem Löschen
+  // des Kontos bei noch gültiger Sitzung). Ohne diese Prüfung scheitert das
+  // Anlegen des Portfolios an der Fremdschlüssel-Bedingung und die Seite
+  // antwortet mit 500.
+  const user = await db.user.findUnique({
+    where: { id: userId },
+    select: { id: true },
+  });
+  if (!user) return null;
+
   const existing = await db.portfolio.findFirst({
     where: { userId },
     orderBy: { createdAt: "asc" },

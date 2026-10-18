@@ -64,6 +64,12 @@ export async function GET(req: Request) {
     }
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
 
     const where: Prisma.TradeWhereInput = { portfolioId: portfolio.id };
     if (type) where.type = type;
@@ -151,6 +157,12 @@ export async function POST(req: Request) {
         : null;
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
 
     const result = await db.$transaction(async (tx) => {
       const asset = await upsertAsset(tx, {
@@ -227,6 +239,12 @@ export async function DELETE(req: Request) {
     }
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
     const trade = await db.trade.findFirst({
       where: { id, portfolioId: portfolio.id },
       include: { asset: true },

@@ -18,6 +18,12 @@ export async function POST() {
 
   try {
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
 
     const result = await db.$transaction(async (tx) => {
       const trades = await tx.trade.deleteMany({

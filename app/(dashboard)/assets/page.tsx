@@ -16,6 +16,7 @@ export default async function AssetsPage() {
   const currency =
     (session.user as { currency?: string }).currency || "EUR";
   const portfolio = await getOrCreatePortfolio(session.user.id);
+  if (!portfolio) redirect("/anmelden");
   const holdings = await db.holding.findMany({
     where: { portfolioId: portfolio.id },
     include: { asset: true },

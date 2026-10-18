@@ -54,6 +54,12 @@ export async function GET() {
 
   try {
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
     const holdings = await db.holding.findMany({
       where: { portfolioId: portfolio.id },
       include: { asset: true },
@@ -117,6 +123,12 @@ export async function POST(req: Request) {
     }
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
     const asset = await upsertAsset(db, {
       symbol,
       name: typeof body.name === "string" ? body.name : null,
@@ -170,6 +182,12 @@ export async function PATCH(req: Request) {
     }
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
     const existing = await loadHolding(id, portfolio.id);
     if (!existing) {
       return NextResponse.json(
@@ -273,6 +291,12 @@ export async function DELETE(req: Request) {
     }
 
     const portfolio = await getOrCreatePortfolio(session.user.id);
+    if (!portfolio) {
+      return NextResponse.json(
+        { error: "Sitzung ungültig – bitte neu anmelden." },
+        { status: 401 }
+      );
+    }
 
     let holdingId = id ?? "";
     if (!holdingId && symbol) {
